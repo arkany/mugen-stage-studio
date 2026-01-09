@@ -72,13 +72,13 @@ class ExportController {
             try? fileManager.removeItem(at: tempDir)
         }
         
-        // Generate and write SFF file
+        // Generate and write SFF file (returns actual image dimensions)
         let sffURL = stageFolder.appendingPathComponent("\(stageName).sff")
-        try writeSFF(for: document, to: sffURL)
+        let imageSize = try writeSFF(for: document, to: sffURL)
         
-        // Generate and write DEF file
+        // Generate and write DEF file with image dimensions for bounds calculation
         let defURL = stageFolder.appendingPathComponent("\(stageName).def")
-        try writeDEF(for: document, to: defURL)
+        try writeDEF(for: document, imageSize: imageSize, to: defURL)
         
         // Create ZIP file
         try createZip(from: stageFolder, to: destinationURL)
@@ -148,30 +148,35 @@ class ExportController {
         return result
     }
     
-    private static func writeSFF(for document: StageDocument, to url: URL) throws {
+    private static func writeSFF(for document: StageDocument, to url: URL) throws -> CGSize {
         guard let firstLayer = document.layers.first else {
             throw ExportError.noLayers
         }
         
-        logger.info("=== Starting Simplified SFF Export (1280x720) ===")
+        // Use original image (no resizing) to support larger scrolling backgrounds
+        let stageImage = firstLayer.image
         
-        // Resize image to exact stage dimensions
-        guard let stageImage = resizeImageToStageSize(firstLayer.image) else {
-            throw ExportError.spriteCreationFailed("Failed to resize image to stage size")
+        // Get actual pixel dimensions from the image
+        guard let tiffData = stageImage.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData) else {
+            throw ExportError.spriteCreationFailed("Failed to read image dimensions")
         }
         
-        logger.info("Stage image resized to: \(stageWidth)x\(stageHeight)")
+        let imageWidth = bitmap.pixelsWide
+        let imageHeight = bitmap.pixelsHigh
+        
+        logger.info("=== Starting SFF Export with Original Dimensions ===")
+        logger.info("Image size: \(imageWidth)x\(imageHeight)")
         
         var sprites: [SFFWriter.Sprite] = []
         
-        // Background sprite: 1280x720
-        // In MUGEN, the axis defines which point in the sprite aligns with the "start" position
-        // With start = 0, 0 in the DEF file:
-        // - axisX = 640 (center of image aligns with screen center X=0)
-        // - axisY = 0 (top of image aligns with camera Y=0, which is top of screen)
-        // This makes the 720px tall image fill from screen top to zoffset (660) + 60px below
-        let axisX: Int16 = 640
-        let axisY: Int16 = 0
+        // Calculate axis dynamically based on image dimensions
+        // axisX = center horizontally (imageWidth / 2)
+        // axisY = ~43% from top (matches working stages)
+        let axisX = Int16(imageWidth / 2)
+        let axisY = Int16(Double(imageHeight) * 0.43)
+        
+        logger.info("Calculated axis: (\(axisX), \(axisY))")
         
         do {
             let bgSprite = try SFFWriter.sprite(
@@ -213,10 +218,13 @@ class ExportController {
         } catch {
             throw ExportError.sffWriteFailed(error.localizedDescription)
         }
+        
+        // Return the actual image dimensions for DEF generation
+        return CGSize(width: imageWidth, height: imageHeight)
     }
     
-    private static func writeDEF(for document: StageDocument, to url: URL) throws {
-        let content = DEFGenerator.generate(from: document)
+    private static func writeDEF(for document: StageDocument, imageSize: CGSize, to url: URL) throws {
+        let content = DEFGenerator.generate(from: document, imageSize: imageSize)
         
         do {
             try content.write(to: url, atomically: true, encoding: .utf8)
