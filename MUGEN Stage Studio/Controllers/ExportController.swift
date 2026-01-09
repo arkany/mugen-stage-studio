@@ -1,8 +1,17 @@
 import Foundation
 import Cocoa
+import os.log
 
 /// Orchestrates the complete stage export process
+/// Simplified to use fixed 1280x720 resolution for guaranteed compatibility
 class ExportController {
+    
+    private static let logger = Logger(subsystem: "com.mugen-stage-studio", category: "Export")
+    
+    // Fixed stage dimensions for compatibility
+    static let stageWidth: Int = 1280
+    static let stageHeight: Int = 720
+    static let stageSize = CGSize(width: stageWidth, height: stageHeight)
     
     enum ExportError: LocalizedError {
         case noLayers
@@ -11,7 +20,8 @@ class ExportController {
         case spriteCreationFailed(String)
         case sffWriteFailed(String)
         case defWriteFailed(String)
-        case invalidExportLocation
+        case zipCreationFailed(String)
+        case cleanupFailed
         
         var errorDescription: String? {
             switch self {
@@ -20,38 +30,46 @@ class ExportController {
             case .thumbnailGenerationFailed:
                 return "Failed to generate stage thumbnail"
             case .directoryCreationFailed:
-                return "Failed to create output directory"
+                return "Failed to create temporary directory"
             case .spriteCreationFailed(let detail):
                 return "Failed to create sprite: \(detail)"
             case .sffWriteFailed(let detail):
                 return "Failed to write SFF file: \(detail)"
             case .defWriteFailed(let detail):
                 return "Failed to write DEF file: \(detail)"
-            case .invalidExportLocation:
-                return "Please export to a 'stages' folder inside your IKEMEN GO installation"
+            case .zipCreationFailed(let detail):
+                return "Failed to create ZIP file: \(detail)"
+            case .cleanupFailed:
+                return "Failed to clean up temporary files"
             }
         }
     }
     
-    /// Export a stage document to the stages folder
+    /// Export a stage document as a ZIP file
     /// - Parameters:
     ///   - document: The stage document to export
-    ///   - stagesFolder: The 'stages' folder URL inside IKEMEN GO
-    ///   - stageName: The name for the stage folder (will be sanitized)
-    static func export(_ document: StageDocument, toStagesFolder stagesFolder: URL) throws {
+    ///   - destinationURL: The destination URL for the ZIP file
+    static func exportAsZip(_ document: StageDocument, to destinationURL: URL) throws {
         let stageName = document.safeName
+        let fileManager = FileManager.default
         
-        // Create stage subfolder: [stagesFolder]/[stageName]/
-        let stageFolder = stagesFolder.appendingPathComponent(stageName)
+        // Create temporary directory for stage files
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let stageFolder = tempDir.appendingPathComponent(stageName)
         
         do {
-            try FileManager.default.createDirectory(
+            try fileManager.createDirectory(
                 at: stageFolder,
                 withIntermediateDirectories: true,
                 attributes: nil
             )
         } catch {
             throw ExportError.directoryCreationFailed
+        }
+        
+        defer {
+            // Clean up temp directory
+            try? fileManager.removeItem(at: tempDir)
         }
         
         // Generate and write SFF file
@@ -61,47 +79,129 @@ class ExportController {
         // Generate and write DEF file
         let defURL = stageFolder.appendingPathComponent("\(stageName).def")
         try writeDEF(for: document, to: defURL)
+        
+        // Create ZIP file
+        try createZip(from: stageFolder, to: destinationURL)
     }
     
     // MARK: - Private Methods
+    
+    /// Resize/crop image to exactly 1280x720 for stage compatibility
+    private static func resizeImageToStageSize(_ image: NSImage) -> NSImage? {
+        let targetSize = stageSize
+        
+        // Create bitmap with exact pixel dimensions
+        guard let bitmapRep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: stageWidth,
+            pixelsHigh: stageHeight,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: stageWidth * 4,
+            bitsPerPixel: 32
+        ) else {
+            return nil
+        }
+        
+        bitmapRep.size = targetSize
+        
+        NSGraphicsContext.saveGraphicsState()
+        guard let context = NSGraphicsContext(bitmapImageRep: bitmapRep) else {
+            NSGraphicsContext.restoreGraphicsState()
+            return nil
+        }
+        NSGraphicsContext.current = context
+        context.imageInterpolation = .high
+        
+        // Calculate source rect to crop/fit maintaining aspect ratio
+        let imageSize = image.size
+        let imageAspect = imageSize.width / imageSize.height
+        let targetAspect = targetSize.width / targetSize.height
+        
+        var sourceRect: NSRect
+        if imageAspect > targetAspect {
+            // Image is wider - crop sides
+            let newWidth = imageSize.height * targetAspect
+            let xOffset = (imageSize.width - newWidth) / 2
+            sourceRect = NSRect(x: xOffset, y: 0, width: newWidth, height: imageSize.height)
+        } else {
+            // Image is taller - crop top/bottom, bias toward top
+            let newHeight = imageSize.width / targetAspect
+            let yOffset = (imageSize.height - newHeight) * 0.3  // Bias toward top
+            sourceRect = NSRect(x: 0, y: yOffset, width: imageSize.width, height: newHeight)
+        }
+        
+        image.draw(
+            in: NSRect(origin: .zero, size: targetSize),
+            from: sourceRect,
+            operation: .copy,
+            fraction: 1.0
+        )
+        
+        NSGraphicsContext.restoreGraphicsState()
+        
+        let result = NSImage(size: targetSize)
+        result.addRepresentation(bitmapRep)
+        return result
+    }
     
     private static func writeSFF(for document: StageDocument, to url: URL) throws {
         guard let firstLayer = document.layers.first else {
             throw ExportError.noLayers
         }
         
-        var sprites: [SFFWriter.Sprite] = []
+        logger.info("=== Starting Simplified SFF Export (1280x720) ===")
         
-        // Add background layer sprites
-        for (index, layer) in document.layers.enumerated() where layer.visible {
-            do {
-                let sprite = try SFFWriter.sprite(
-                    from: layer.image,
-                    group: 0,
-                    index: UInt16(index),
-                    axisX: Int16(layer.image.size.width / 2),
-                    axisY: Int16(layer.image.size.height)
-                )
-                sprites.append(sprite)
-            } catch {
-                throw ExportError.spriteCreationFailed(error.localizedDescription)
-            }
+        // Resize image to exact stage dimensions
+        guard let stageImage = resizeImageToStageSize(firstLayer.image) else {
+            throw ExportError.spriteCreationFailed("Failed to resize image to stage size")
         }
         
-        // Generate and add thumbnail (group 9000, index 1)
-        guard let thumbnail = ThumbnailGenerator.generate(from: firstLayer.image) else {
+        logger.info("Stage image resized to: \(stageWidth)x\(stageHeight)")
+        
+        var sprites: [SFFWriter.Sprite] = []
+        
+        // Background sprite: 1280x720
+        // In MUGEN, the axis defines which point in the sprite aligns with the "start" position
+        // With start = 0, 0 in the DEF file:
+        // - axisX = 640 (center of image aligns with screen center X=0)
+        // - axisY = 0 (top of image aligns with camera Y=0, which is top of screen)
+        // This makes the 720px tall image fill from screen top to zoffset (660) + 60px below
+        let axisX: Int16 = 640
+        let axisY: Int16 = 0
+        
+        do {
+            let bgSprite = try SFFWriter.sprite(
+                from: stageImage,
+                group: 0,
+                index: 0,
+                axisX: axisX,
+                axisY: axisY
+            )
+            logger.info("Background sprite: \(bgSprite.width)x\(bgSprite.height), axis=(\(bgSprite.axisX), \(bgSprite.axisY))")
+            sprites.append(bgSprite)
+        } catch {
+            throw ExportError.spriteCreationFailed(error.localizedDescription)
+        }
+        
+        // Thumbnail sprite: 240x100, axis at 0,0
+        guard let thumbnail = ThumbnailGenerator.generate(from: stageImage) else {
             throw ExportError.thumbnailGenerationFailed
         }
         
         do {
-            let thumbnailSprite = try SFFWriter.sprite(
+            let thumbSprite = try SFFWriter.sprite(
                 from: thumbnail,
                 group: 9000,
                 index: 1,
-                axisX: Int16(thumbnail.size.width / 2),
-                axisY: Int16(thumbnail.size.height / 2)
+                axisX: 0,
+                axisY: 0
             )
-            sprites.append(thumbnailSprite)
+            logger.info("Thumbnail sprite: \(thumbSprite.width)x\(thumbSprite.height)")
+            sprites.append(thumbSprite)
         } catch {
             throw ExportError.spriteCreationFailed("thumbnail: \(error.localizedDescription)")
         }
@@ -109,6 +209,7 @@ class ExportController {
         // Write SFF file
         do {
             try SFFWriter.write(sprites: sprites, to: url)
+            logger.info("SFF written successfully: \(sprites.count) sprites")
         } catch {
             throw ExportError.sffWriteFailed(error.localizedDescription)
         }
@@ -121,6 +222,41 @@ class ExportController {
             try content.write(to: url, atomically: true, encoding: .utf8)
         } catch {
             throw ExportError.defWriteFailed(error.localizedDescription)
+        }
+    }
+    
+    /// Create a ZIP file from a directory
+    private static func createZip(from sourceFolder: URL, to destinationURL: URL) throws {
+        let fileManager = FileManager.default
+        
+        // Remove existing file if present
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+        
+        // Use NSFileCoordinator for safe file access
+        let coordinator = NSFileCoordinator()
+        var coordinatorError: NSError?
+        var zipError: Error?
+        
+        coordinator.coordinate(
+            readingItemAt: sourceFolder,
+            options: .forUploading,
+            error: &coordinatorError
+        ) { zipURL in
+            do {
+                try fileManager.copyItem(at: zipURL, to: destinationURL)
+            } catch {
+                zipError = error
+            }
+        }
+        
+        if let error = coordinatorError {
+            throw ExportError.zipCreationFailed(error.localizedDescription)
+        }
+        
+        if let error = zipError {
+            throw ExportError.zipCreationFailed(error.localizedDescription)
         }
     }
 }

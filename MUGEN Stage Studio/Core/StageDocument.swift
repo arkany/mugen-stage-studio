@@ -35,12 +35,13 @@ class StageDocument: ObservableObject {
         let screenWidth = resolution.size.width
         let screenHeight = resolution.size.height
         
-        // Ground line: image height - 75 (from learnings)
-        groundLineY = Int(imageSize.height) - 75
+        // Ground line (zoffset): position from top of screen where floor is
+        // For a 720-height screen, floor at bottom = ~660 (leaves 60px margin)
+        groundLineY = Int(screenHeight) - 60
         
-        // Camera bounds: how far camera can pan
+        // Camera bounds: how far camera can pan based on image vs screen size
         let cameraPanX = max(0, (imageSize.width - screenWidth) / 2)
-        let cameraPanY = max(0, imageSize.height - screenHeight - 25)
+        let cameraPanY = max(0, imageSize.height - screenHeight)
         
         camera.boundsRect = CGRect(
             x: -cameraPanX,
@@ -49,7 +50,7 @@ class StageDocument: ObservableObject {
             height: cameraPanY
         )
         
-        // Background layer position (centered, bottom-aligned)
+        // Background layer position for canvas display (centered, bottom-aligned)
         if var layer = layers.first {
             layer.position = CGPoint(
                 x: -imageSize.width / 2,
@@ -57,6 +58,11 @@ class StageDocument: ObservableObject {
             )
             layers[0] = layer
         }
+        
+        // Player positions: use reasonable spacing (within half screen width)
+        let playerSpacing = min(200, Int(screenWidth / 4))
+        players.p1X = -playerSpacing
+        players.p2X = playerSpacing
     }
 }
 

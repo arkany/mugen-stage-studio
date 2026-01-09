@@ -1,9 +1,12 @@
 import Foundation
 import Cocoa
+import os.log
 
 /// Generates SFF v2 sprite files for MUGEN/IKEMEN GO stages
 /// Ported from IKEMEN Lab implementation with learnings applied
 class SFFWriter {
+    
+    private static let logger = Logger(subsystem: "com.mugen-stage-studio", category: "SFFWriter")
     
     // MARK: - Constants
     
@@ -71,6 +74,13 @@ class SFFWriter {
     ///   - sprites: Array of sprites to include
     ///   - url: Destination file URL
     static func write(sprites: [Sprite], to url: URL) throws {
+        logger.info("=== SFFWriter.write ===")
+        logger.info("Sprite count: \(sprites.count)")
+        
+        for (i, sprite) in sprites.enumerated() {
+            logger.info("  Sprite[\(i)]: group=\(sprite.group), index=\(sprite.index), size=\(sprite.width)x\(sprite.height), axis=(\(sprite.axisX),\(sprite.axisY)), format=\(sprite.format), pngSize=\(sprite.pngData.count)")
+        }
+        
         var data = Data()
         
         let spriteCount = UInt32(sprites.count)
@@ -81,8 +91,14 @@ class SFFWriter {
         let paletteListOffset = spriteListOffset + (spriteCount * spriteNodeSize)
         let ldataOffset = paletteListOffset + (paletteCount * paletteNodeSize)
         
-        // Build ldata (literal data) section containing all PNG data
+        // Build ldata (literal data) section containing palette and PNG data
         var ldata = Data()
+        
+        // First: dummy palette data (4 bytes - one RGBA color: transparent black)
+        let dummyPaletteOffset = UInt32(ldata.count)
+        ldata.append(contentsOf: [0x00, 0x00, 0x00, 0x00])  // RGBA = transparent black
+        
+        // Then: sprite PNG data
         var spriteDataOffsets: [UInt32] = []
         var spriteDataLengths: [UInt32] = []
         
@@ -100,6 +116,13 @@ class SFFWriter {
         
         let ldataLength = UInt32(ldata.count)
         
+        logger.info("Offsets: spriteList=\(spriteListOffset), paletteList=\(paletteListOffset), ldata=\(ldataOffset)")
+        logger.info("Sizes: ldataLength=\(ldataLength)")
+        
+        for (i, offset) in spriteDataOffsets.enumerated() {
+            logger.info("  Sprite[\(i)] data: offset=\(offset), length=\(spriteDataLengths[i])")
+        }
+        
         // tdata section (translated data) - not used for PNG sprites
         let tdataOffset = ldataOffset + ldataLength
         let tdataLength: UInt32 = 0
@@ -112,7 +135,9 @@ class SFFWriter {
         }
         
         data.append(contentsOf: version)                    // 12-15: Version
-        data.append(Data(count: 20))                        // 16-35: Reserved/unused (zeros)
+        data.append(Data(count: 8))                         // 16-23: Reserved (zeros)
+        data.append(contentsOf: version)                    // 24-27: Compat version (same as version)
+        data.append(Data(count: 8))                         // 28-35: Reserved (zeros)
         data.append(littleEndian: spriteListOffset)         // 36-39: Sprite list offset
         data.append(littleEndian: spriteCount)              // 40-43: Sprite count
         data.append(littleEndian: paletteListOffset)        // 44-47: Palette list offset
@@ -126,10 +151,13 @@ class SFFWriter {
         
         // Write sprite nodes (28 bytes each)
         for (index, sprite) in sprites.enumerated() {
+            logger.info("Writing sprite[\(index)] node: group=\(sprite.group), index=\(sprite.index), width=\(sprite.width), height=\(sprite.height)")
+            let nodeStartOffset = data.count
             data.append(littleEndian: sprite.group)             // 0-1: Group
             data.append(littleEndian: sprite.index)             // 2-3: Index
             data.append(littleEndian: sprite.width)             // 4-5: Width
             data.append(littleEndian: sprite.height)            // 6-7: Height
+            logger.info("  After width/height, data bytes at offset \(nodeStartOffset+4): \(data.subdata(in: (nodeStartOffset+4)..<(nodeStartOffset+8)).map { String(format: "%02x", $0) }.joined(separator: " "))")
             data.append(littleEndian: sprite.axisX)             // 8-9: X axis
             data.append(littleEndian: sprite.axisY)             // 10-11: Y axis
             data.append(littleEndian: UInt16(0xFFFF))           // 12-13: Linked index (none)
@@ -154,9 +182,12 @@ class SFFWriter {
         data.append(ldata)
         
         // Write file
+        logger.info("Total file size: \(data.count) bytes")
         do {
             try data.write(to: url)
+            logger.info("SFF file written successfully")
         } catch {
+            logger.error("Failed to write SFF: \(error.localizedDescription)")
             throw SFFWriteError.fileWriteFailed(error.localizedDescription)
         }
     }
@@ -179,17 +210,35 @@ class SFFWriter {
         axisY: Int16? = nil
     ) throws -> Sprite {
         
+        logger.info("Creating sprite from image: NSImage.size=\(Int(image.size.width))x\(Int(image.size.height))")
+        
         // Get PNG data
-        guard let tiffData = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmap.representation(using: .png, properties: [:]) else {
+        guard let tiffData = image.tiffRepresentation else {
+            logger.error("Failed to get TIFF representation")
             throw SFFWriteError.pngEncodingFailed
         }
+        logger.info("  TIFF data size: \(tiffData.count) bytes")
         
-        let width = UInt16(image.size.width)
-        let height = UInt16(image.size.height)
+        guard let bitmap = NSBitmapImageRep(data: tiffData) else {
+            logger.error("Failed to create bitmap from TIFF")
+            throw SFFWriteError.pngEncodingFailed
+        }
+        logger.info("  Bitmap: \(bitmap.pixelsWide)x\(bitmap.pixelsHigh), bitsPerPixel=\(bitmap.bitsPerPixel), hasAlpha=\(bitmap.hasAlpha)")
+        
+        guard let pngData = bitmap.representation(using: .png, properties: [:]) else {
+            logger.error("Failed to encode PNG")
+            throw SFFWriteError.pngEncodingFailed
+        }
+        logger.info("  PNG data size: \(pngData.count) bytes")
+        
+        // Use pixel dimensions from bitmap, not NSImage.size (which can be points, not pixels)
+        let width = UInt16(bitmap.pixelsWide)
+        let height = UInt16(bitmap.pixelsHigh)
+        
+        logger.info("  Final dimensions: \(width)x\(height)")
         
         guard width > 0 && height > 0 else {
+            logger.error("Invalid image size: \(width)x\(height)")
             throw SFFWriteError.invalidImageSize
         }
         

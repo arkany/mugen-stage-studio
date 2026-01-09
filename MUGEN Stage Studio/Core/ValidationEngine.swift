@@ -70,9 +70,10 @@ class ValidationEngine {
             }
         }
         
-        // Check player positions
-        let leftBound = document.camera.boundLeft - 50
-        let rightBound = document.camera.boundRight + 50
+        // Check player positions - should be within visible screen area
+        let screenHalfWidth = Int(document.resolution.size.width / 2)
+        let leftBound = -screenHalfWidth + 50
+        let rightBound = screenHalfWidth - 50
         
         if document.players.p1X < leftBound || document.players.p1X > rightBound {
             warnings.append(ValidationResult.Issue(

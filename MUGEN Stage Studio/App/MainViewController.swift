@@ -167,16 +167,17 @@ class MainViewController: NSViewController {
     }
     
     private func performExport() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        panel.message = "Select the 'stages' folder in your IKEMEN GO installation"
-        panel.prompt = "Select Stages Folder"
+        let stageName = stageDocument.safeName
+        
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.zip]
+        panel.nameFieldStringValue = "\(stageName).zip"
+        panel.message = "Save your stage as a ZIP file to import via IKEMEN Lab"
+        panel.prompt = "Export"
         
         panel.beginSheetModal(for: view.window!) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
-            self?.exportStage(toStagesFolder: url)
+            self?.exportStageAsZip(to: url)
         }
     }
     
@@ -218,13 +219,12 @@ class MainViewController: NSViewController {
         documentDidChange()
     }
     
-    private func exportStage(toStagesFolder stagesFolder: URL) {
+    private func exportStageAsZip(to url: URL) {
         let stageName = stageDocument.safeName
-        let stageFolder = stagesFolder.appendingPathComponent(stageName)
         
         do {
-            try ExportController.export(stageDocument, toStagesFolder: stagesFolder)
-            showSuccess("Stage exported!", message: "Your stage '\(stageName)' has been saved to:\n\(stageFolder.path)")
+            try ExportController.exportAsZip(stageDocument, to: url)
+            showSuccess("Stage exported!", message: "Your stage '\(stageName)' has been saved as a ZIP file.\n\nImport it using IKEMEN Lab to add it to your game.")
         } catch {
             showError("Export failed", message: error.localizedDescription)
         }

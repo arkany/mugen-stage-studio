@@ -158,8 +158,8 @@ class CanvasView: NSView {
             context.strokePath()
         }
         
-        // Label at top
-        let label = "Screen (\(document.resolution.width)×\(document.resolution.height))"
+        // Label at top - fixed export size
+        let label = "Export Area (1280×720)"
         drawLabel(label, at: NSPoint(x: screenRect.minX + 5, y: screenRect.maxY + 8), color: screenFrameColor)
         
         // Note: Drag the green Ground line to move screen up/down
@@ -350,24 +350,33 @@ class CanvasView: NSView {
             return NSRect(x: canvasPadding, y: canvasPadding, width: 1280, height: 720)
         }
         
-        let screenSize = document.resolution.size
+        // Fixed export size: 1280x720
+        let targetWidth: CGFloat = 1280
+        let targetHeight: CGFloat = 720
+        let targetAspect = targetWidth / targetHeight
         
-        // Screen frame is centered horizontally on the image
-        // and positioned so ground line aligns with bottom of screen + some offset
-        let screenX = canvasPadding + (imageSize.width - screenSize.width) / 2
+        // Calculate the crop rect that matches export behavior
+        let imageAspect = imageSize.width / imageSize.height
         
-        // The ground line in canvas coords
-        let groundY = groundLineY()
+        var cropRect: NSRect
+        if imageAspect > targetAspect {
+            // Image is wider - crop sides (center horizontally)
+            let newWidth = imageSize.height * targetAspect
+            let xOffset = (imageSize.width - newWidth) / 2
+            cropRect = NSRect(x: xOffset, y: 0, width: newWidth, height: imageSize.height)
+        } else {
+            // Image is taller - crop top/bottom, bias toward top (30% from top)
+            let newHeight = imageSize.width / targetAspect
+            let yOffset = (imageSize.height - newHeight) * 0.3
+            cropRect = NSRect(x: 0, y: yOffset, width: imageSize.width, height: newHeight)
+        }
         
-        // Screen bottom should be at ground level (players stand on ground)
-        // Screen extends upward from there
-        let screenY = groundY
-        
+        // Convert to canvas coordinates (add padding)
         return NSRect(
-            x: screenX,
-            y: screenY,
-            width: screenSize.width,
-            height: screenSize.height
+            x: canvasPadding + cropRect.origin.x,
+            y: canvasPadding + cropRect.origin.y,
+            width: cropRect.width,
+            height: cropRect.height
         )
     }
     
