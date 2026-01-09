@@ -93,21 +93,22 @@ class ExportController {
     
     // MARK: - Private Methods
     
-    /// Resize/crop image to exactly 1280x720 for stage compatibility
-    private static func resizeImageToStageSize(_ image: NSImage) -> NSImage? {
-        let targetSize = stageSize
+    /// Resize/crop image to a specific size for fixed resolution export
+    private static func resizeImageToSize(_ image: NSImage, targetSize: CGSize) -> NSImage? {
+        let targetWidth = Int(targetSize.width)
+        let targetHeight = Int(targetSize.height)
         
         // Create bitmap with exact pixel dimensions
         guard let bitmapRep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
-            pixelsWide: stageWidth,
-            pixelsHigh: stageHeight,
+            pixelsWide: targetWidth,
+            pixelsHigh: targetHeight,
             bitsPerSample: 8,
             samplesPerPixel: 4,
             hasAlpha: true,
             isPlanar: false,
             colorSpaceName: .deviceRGB,
-            bytesPerRow: stageWidth * 4,
+            bytesPerRow: targetWidth * 4,
             bitsPerPixel: 32
         ) else {
             return nil
@@ -160,17 +161,37 @@ class ExportController {
             throw ExportError.noLayers
         }
         
-        // Use original image (no resizing) to support larger scrolling backgrounds
-        let stageImage = firstLayer.image
+        let originalImage = firstLayer.image
+        let stageImage: NSImage
+        let imageWidth: Int
+        let imageHeight: Int
         
-        // Get actual pixel dimensions from the image
-        guard let tiffData = stageImage.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData) else {
-            throw ExportError.spriteCreationFailed("Failed to read image dimensions")
+        // Check if we should resize to fixed resolution or use original (custom)
+        if let fixedSize = document.resolution.size {
+            // Fixed resolution - resize/crop the image
+            logger.info("=== Starting SFF Export with Fixed Resolution \(Int(fixedSize.width))x\(Int(fixedSize.height)) ===")
+            
+            guard let resizedImage = resizeImageToSize(originalImage, targetSize: fixedSize) else {
+                throw ExportError.spriteCreationFailed("Failed to resize image to target size")
+            }
+            stageImage = resizedImage
+            imageWidth = Int(fixedSize.width)
+            imageHeight = Int(fixedSize.height)
+        } else {
+            // Custom resolution - use original image dimensions
+            stageImage = originalImage
+            
+            // Get actual pixel dimensions from the image
+            guard let tiffData = stageImage.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiffData) else {
+                throw ExportError.spriteCreationFailed("Failed to read image dimensions")
+            }
+            
+            imageWidth = bitmap.pixelsWide
+            imageHeight = bitmap.pixelsHigh
+            
+            logger.info("=== Starting SFF Export with Custom Dimensions \(imageWidth)x\(imageHeight) ===")
         }
-        
-        let imageWidth = bitmap.pixelsWide
-        let imageHeight = bitmap.pixelsHigh
         
         // Validate image dimensions fit within Int16 range for SFF format
         guard imageWidth > 0 && imageHeight > 0 else {
@@ -180,22 +201,22 @@ class ExportController {
             throw ExportError.spriteCreationFailed("Image dimensions exceed maximum supported size (\(maxImageDimension)x\(maxImageDimension))")
         }
         
-        logger.info("=== Starting SFF Export with Original Dimensions ===")
         logger.info("Image size: \(imageWidth)x\(imageHeight)")
         
         var sprites: [SFFWriter.Sprite] = []
         
-        // Calculate axis dynamically based on image dimensions
-        // axisX = center horizontally (imageWidth / 2)
-        // axisY = verticalAxisRatio from top (matches working stages)
-        let axisXValue = imageWidth / 2
-        let axisYValue = Int(Double(imageHeight) * verticalAxisRatio)
+        // Calculate axis based on working stage analysis:
+        // Working stage (1536x1024) has axis (768, 1248) with zoffset=944
+        // Formula: axisX = imageWidth/2, axisY = imageHeight + (localcoordHeight - 75)
+        // This positions the sprite so characters stand at the correct ground level
+        let axisX: Int16
+        let axisY: Int16
         
-        // Safe conversion to Int16 (already validated that dimensions are within range)
-        let axisX = Int16(clamping: axisXValue)
-        let axisY = Int16(clamping: axisYValue)
+        let localcoordHeight = 720
+        axisX = Int16(clamping: imageWidth / 2)
+        axisY = Int16(clamping: imageHeight + (localcoordHeight - 75))
         
-        logger.info("Calculated axis: (\(axisX), \(axisY))")
+        logger.info("Calculated axis: (\(axisX), \(axisY)) using formula: imageHeight + (localcoordHeight - 75)")
         
         do {
             let bgSprite = try SFFWriter.sprite(

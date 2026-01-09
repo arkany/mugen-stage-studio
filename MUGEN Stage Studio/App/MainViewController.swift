@@ -192,17 +192,78 @@ class MainViewController: NSViewController {
             return
         }
         
+        // Get actual pixel dimensions
+        guard let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData) else {
+            showError("Failed to load image", message: "Could not read image dimensions.")
+            return
+        }
+        
+        let imageWidth = bitmap.pixelsWide
+        let imageHeight = bitmap.pixelsHigh
+        let imageSize = CGSize(width: imageWidth, height: imageHeight)
+        
         // Validate image size
-        let size = image.size
-        if size.width < 320 || size.height < 240 {
+        if imageWidth < 320 || imageHeight < 240 {
             showError("Image too small", message: "The image must be at least 320×240 pixels.")
             return
         }
         
-        if size.width > 4096 || size.height > 4096 {
+        if imageWidth > 4096 || imageHeight > 4096 {
             showWarning("Large image", message: "Images over 4096 pixels may cause performance issues in IKEMEN GO.")
         }
         
+        // Check if image matches current fixed resolution
+        let currentResolution = stageDocument.resolution
+        if let fixedSize = currentResolution.size {
+            let matchesResolution = (imageWidth == Int(fixedSize.width) && imageHeight == Int(fixedSize.height))
+            
+            if !matchesResolution {
+                // Ask user: crop to fixed size or use custom (scrolling)?
+                promptForResolutionChoice(image: image, imageSize: imageSize, url: url, currentResolution: currentResolution)
+                return
+            }
+        }
+        
+        // Image matches resolution or already custom - proceed with import
+        performImageImport(image: image, imageSize: imageSize, url: url)
+    }
+    
+    private func promptForResolutionChoice(image: NSImage, imageSize: CGSize, url: URL, currentResolution: Resolution) {
+        let imageWidth = Int(imageSize.width)
+        let imageHeight = Int(imageSize.height)
+        let fixedSize = currentResolution.size!
+        
+        let alert = NSAlert()
+        alert.messageText = "Image Size Mismatch"
+        alert.informativeText = "The image (\(imageWidth)×\(imageHeight)) doesn't match the selected resolution (\(Int(fixedSize.width))×\(Int(fixedSize.height))).\n\nWould you like to crop it to fit, or use the original size for a scrolling stage?"
+        alert.alertStyle = .informational
+        
+        alert.addButton(withTitle: "Use Original (Scrolling)")
+        alert.addButton(withTitle: "Crop to \(currentResolution.rawValue)")
+        alert.addButton(withTitle: "Cancel")
+        
+        alert.beginSheetModal(for: view.window!) { [weak self] response in
+            guard let self = self else { return }
+            
+            switch response {
+            case .alertFirstButtonReturn:
+                // Use custom/original size
+                self.stageDocument.resolution = .custom
+                self.performImageImport(image: image, imageSize: imageSize, url: url)
+                
+            case .alertSecondButtonReturn:
+                // Keep fixed resolution - image will be cropped on export
+                self.performImageImport(image: image, imageSize: imageSize, url: url)
+                
+            default:
+                // Cancelled
+                break
+            }
+        }
+    }
+    
+    private func performImageImport(image: NSImage, imageSize: CGSize, url: URL) {
         // Create background layer
         let layer = BackgroundLayer(
             name: url.deletingPathExtension().lastPathComponent,
@@ -224,7 +285,7 @@ class MainViewController: NSViewController {
         }
         
         // Calculate initial values based on image
-        stageDocument.applyDefaults(for: image.size)
+        stageDocument.applyDefaults(for: imageSize)
         
         stageDocument.undoManager?.endUndoGrouping()
         stageDocument.undoManager?.setActionName("Import Image")
