@@ -13,6 +13,13 @@ class ExportController {
     static let stageHeight: Int = 720
     static let stageSize = CGSize(width: stageWidth, height: stageHeight)
     
+    // Axis positioning ratio for MUGEN stages
+    // 0.43 (~43% from top) matches working stages and provides proper vertical alignment
+    private static let verticalAxisRatio: Double = 0.43
+    
+    // Maximum image dimension supported by Int16 in SFF format
+    private static let maxImageDimension: Int = 32767
+    
     enum ExportError: LocalizedError {
         case noLayers
         case thumbnailGenerationFailed
@@ -165,6 +172,14 @@ class ExportController {
         let imageWidth = bitmap.pixelsWide
         let imageHeight = bitmap.pixelsHigh
         
+        // Validate image dimensions fit within Int16 range for SFF format
+        guard imageWidth > 0 && imageHeight > 0 else {
+            throw ExportError.spriteCreationFailed("Image dimensions must be positive")
+        }
+        guard imageWidth <= maxImageDimension && imageHeight <= maxImageDimension else {
+            throw ExportError.spriteCreationFailed("Image dimensions exceed maximum supported size (\(maxImageDimension)x\(maxImageDimension))")
+        }
+        
         logger.info("=== Starting SFF Export with Original Dimensions ===")
         logger.info("Image size: \(imageWidth)x\(imageHeight)")
         
@@ -172,9 +187,9 @@ class ExportController {
         
         // Calculate axis dynamically based on image dimensions
         // axisX = center horizontally (imageWidth / 2)
-        // axisY = ~43% from top (matches working stages)
+        // axisY = verticalAxisRatio from top (matches working stages)
         let axisX = Int16(imageWidth / 2)
-        let axisY = Int16(Double(imageHeight) * 0.43)
+        let axisY = Int16(Double(imageHeight) * verticalAxisRatio)
         
         logger.info("Calculated axis: (\(axisX), \(axisY))")
         
