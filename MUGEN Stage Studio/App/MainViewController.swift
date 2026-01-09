@@ -105,6 +105,11 @@ class MainViewController: NSViewController {
         super.viewDidAppear()
         setupToolbar()
         
+        // Connect undo manager from window to document
+        if let windowUndoManager = view.window?.undoManager {
+            stageDocument.undoManager = windowUndoManager
+        }
+        
         // Set initial divider positions now that view is sized
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -204,8 +209,14 @@ class MainViewController: NSViewController {
             image: image
         )
         
-        // Update document
-        stageDocument.layers = [layer]
+        // Group all initial setup as a single undo action
+        stageDocument.undoManager?.beginUndoGrouping()
+        
+        // Clear existing layers and add new one
+        while !stageDocument.layers.isEmpty {
+            stageDocument.removeLayer(at: 0, actionName: "Import Image")
+        }
+        stageDocument.addLayer(layer, actionName: "Import Image")
         
         // Set default name from filename if not set
         if stageDocument.name.isEmpty {
@@ -214,6 +225,9 @@ class MainViewController: NSViewController {
         
         // Calculate initial values based on image
         stageDocument.applyDefaults(for: image.size)
+        
+        stageDocument.undoManager?.endUndoGrouping()
+        stageDocument.undoManager?.setActionName("Import Image")
         
         // Refresh UI
         documentDidChange()
@@ -450,14 +464,16 @@ extension MainViewController: LayerSidebarViewDelegate {
     
     func layerSidebarView(_ view: LayerSidebarView, didToggleVisibility layer: BackgroundLayer) {
         if let index = stageDocument.layers.firstIndex(where: { $0.id == layer.id }) {
-            stageDocument.layers[index].visible.toggle()
+            var updatedLayer = stageDocument.layers[index]
+            updatedLayer.visible.toggle()
+            stageDocument.updateLayer(at: index, with: updatedLayer, actionName: "Toggle Layer Visibility")
             documentDidChange()
         }
     }
     
     func layerSidebarView(_ view: LayerSidebarView, didAddLayerWithImage image: NSImage, filename: String) {
         let layer = BackgroundLayer(name: filename, image: image)
-        stageDocument.layers.append(layer)
+        stageDocument.addLayer(layer, actionName: "Add Layer")
         documentDidChange()
     }
 }
@@ -467,34 +483,41 @@ extension MainViewController: LayerSidebarViewDelegate {
 extension MainViewController: CanvasViewControllerDelegate {
     
     func canvasViewController(_ controller: CanvasViewController, didUpdateGroundLine y: CGFloat) {
+        // groundLineY has built-in undo via didSet
         stageDocument.groundLineY = Int(y)
         documentDidChange()
     }
     
     func canvasViewController(_ controller: CanvasViewController, didUpdateCameraBounds bounds: CGRect) {
-        stageDocument.camera.boundsRect = bounds
+        stageDocument.setCameraBounds(bounds, actionName: "Resize Camera Bounds")
         documentDidChange()
     }
     
     func canvasViewController(_ controller: CanvasViewController, didUpdatePlayer1X x: CGFloat) {
-        stageDocument.players.p1X = Int(x)
+        stageDocument.setPlayer1X(Int(x), actionName: "Move Player 1")
         documentDidChange()
     }
     
     func canvasViewController(_ controller: CanvasViewController, didUpdatePlayer2X x: CGFloat) {
-        stageDocument.players.p2X = Int(x)
+        stageDocument.setPlayer2X(Int(x), actionName: "Move Player 2")
         documentDidChange()
     }
     
     func canvasViewControllerDidReceiveImageDrop(_ controller: CanvasViewController, image: NSImage, filename: String) {
+        stageDocument.undoManager?.beginUndoGrouping()
+        
         let layer = BackgroundLayer(name: filename, image: image)
-        stageDocument.layers.append(layer)
+        stageDocument.addLayer(layer, actionName: "Drop Image")
         
         if stageDocument.name.isEmpty {
             stageDocument.name = filename
         }
         
         stageDocument.applyDefaults(for: image.size)
+        
+        stageDocument.undoManager?.endUndoGrouping()
+        stageDocument.undoManager?.setActionName("Drop Image")
+        
         documentDidChange()
     }
 }
