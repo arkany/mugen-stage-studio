@@ -6,16 +6,144 @@ import Cocoa
 /// Main data model representing a stage being edited
 class StageDocument: ObservableObject {
     
-    @Published var name: String = ""
-    @Published var resolution: Resolution = .hd_1280x720
-    @Published var targetEngine: Engine = .ikemenGo
+    // MARK: - Undo Manager
+    
+    /// The undo manager for this document. Set by the window controller.
+    weak var undoManager: UndoManager?
+    
+    // MARK: - Published Properties
+    
+    @Published var name: String = "" {
+        didSet {
+            if oldValue != name {
+                registerUndo(oldValue: oldValue, newValue: name, keyPath: \.name, actionName: "Change Name")
+            }
+        }
+    }
+    
+    @Published var resolution: Resolution = .hd_1280x720 {
+        didSet {
+            if oldValue != resolution {
+                registerUndo(oldValue: oldValue, newValue: resolution, keyPath: \.resolution, actionName: "Change Resolution")
+            }
+        }
+    }
+    
+    @Published var targetEngine: Engine = .ikemenGo {
+        didSet {
+            if oldValue != targetEngine {
+                registerUndo(oldValue: oldValue, newValue: targetEngine, keyPath: \.targetEngine, actionName: "Change Engine")
+            }
+        }
+    }
+    
     @Published var camera: CameraSettings = CameraSettings()
     @Published var players: PlayerSettings = PlayerSettings()
     @Published var shadow: ShadowSettings = ShadowSettings()
     @Published var layers: [BackgroundLayer] = []
     
     /// The Y position of the ground line (converts to zoffset)
-    @Published var groundLineY: Int = 645
+    @Published var groundLineY: Int = 645 {
+        didSet {
+            if oldValue != groundLineY {
+                registerUndo(oldValue: oldValue, newValue: groundLineY, keyPath: \.groundLineY, actionName: "Move Ground Line")
+            }
+        }
+    }
+    
+    // MARK: - Undo Support
+    
+    /// Register an undo action for a simple value change
+    private func registerUndo<T>(oldValue: T, newValue: T, keyPath: ReferenceWritableKeyPath<StageDocument, T>, actionName: String) {
+        undoManager?.registerUndo(withTarget: self) { [weak self] target in
+            target[keyPath: keyPath] = oldValue
+        }
+        undoManager?.setActionName(actionName)
+    }
+    
+    /// Set a property without triggering undo registration (for programmatic changes)
+    func setWithoutUndo<T>(_ keyPath: ReferenceWritableKeyPath<StageDocument, T>, to value: T) {
+        undoManager?.disableUndoRegistration()
+        self[keyPath: keyPath] = value
+        undoManager?.enableUndoRegistration()
+    }
+    
+    // MARK: - Layer Management with Undo
+    
+    func addLayer(_ layer: BackgroundLayer, actionName: String = "Add Layer") {
+        let index = layers.count
+        layers.append(layer)
+        
+        undoManager?.registerUndo(withTarget: self) { [weak self] target in
+            self?.removeLayer(at: index, actionName: actionName)
+        }
+        undoManager?.setActionName(actionName)
+    }
+    
+    func removeLayer(at index: Int, actionName: String = "Remove Layer") {
+        guard index < layers.count else { return }
+        let removedLayer = layers[index]
+        layers.remove(at: index)
+        
+        undoManager?.registerUndo(withTarget: self) { [weak self] target in
+            self?.insertLayer(removedLayer, at: index, actionName: actionName)
+        }
+        undoManager?.setActionName(actionName)
+    }
+    
+    func insertLayer(_ layer: BackgroundLayer, at index: Int, actionName: String = "Insert Layer") {
+        layers.insert(layer, at: min(index, layers.count))
+        
+        undoManager?.registerUndo(withTarget: self) { [weak self] target in
+            self?.removeLayer(at: index, actionName: actionName)
+        }
+        undoManager?.setActionName(actionName)
+    }
+    
+    func updateLayer(at index: Int, with layer: BackgroundLayer, actionName: String = "Edit Layer") {
+        guard index < layers.count else { return }
+        let oldLayer = layers[index]
+        layers[index] = layer
+        
+        undoManager?.registerUndo(withTarget: self) { [weak self] target in
+            self?.updateLayer(at: index, with: oldLayer, actionName: actionName)
+        }
+        undoManager?.setActionName(actionName)
+    }
+    
+    // MARK: - Player Position with Undo
+    
+    func setPlayer1X(_ x: Int, actionName: String = "Move Player 1") {
+        let oldValue = players.p1X
+        players.p1X = x
+        
+        undoManager?.registerUndo(withTarget: self) { [weak self] target in
+            self?.setPlayer1X(oldValue, actionName: actionName)
+        }
+        undoManager?.setActionName(actionName)
+    }
+    
+    func setPlayer2X(_ x: Int, actionName: String = "Move Player 2") {
+        let oldValue = players.p2X
+        players.p2X = x
+        
+        undoManager?.registerUndo(withTarget: self) { [weak self] target in
+            self?.setPlayer2X(oldValue, actionName: actionName)
+        }
+        undoManager?.setActionName(actionName)
+    }
+    
+    // MARK: - Camera Bounds with Undo
+    
+    func setCameraBounds(_ bounds: CGRect, actionName: String = "Resize Camera Bounds") {
+        let oldBounds = camera.boundsRect
+        camera.boundsRect = bounds
+        
+        undoManager?.registerUndo(withTarget: self) { [weak self] target in
+            self?.setCameraBounds(oldBounds, actionName: actionName)
+        }
+        undoManager?.setActionName(actionName)
+    }
     
     /// Sanitized name for file/folder naming (spaces → underscores, safe characters only)
     var safeName: String {
