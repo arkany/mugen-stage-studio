@@ -188,8 +188,12 @@ class ExportController {
         // Calculate axis dynamically based on image dimensions
         // axisX = center horizontally (imageWidth / 2)
         // axisY = verticalAxisRatio from top (matches working stages)
-        let axisX = Int16(imageWidth / 2)
-        let axisY = Int16(Double(imageHeight) * verticalAxisRatio)
+        let axisXValue = imageWidth / 2
+        let axisYValue = Int(Double(imageHeight) * verticalAxisRatio)
+        
+        // Safe conversion to Int16 (already validated that dimensions are within range)
+        let axisX = Int16(clamping: axisXValue)
+        let axisY = Int16(clamping: axisYValue)
         
         logger.info("Calculated axis: (\(axisX), \(axisY))")
         
