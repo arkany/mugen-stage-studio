@@ -1,7 +1,7 @@
 import Foundation
 
 /// Generates .def stage definition files for MUGEN/IKEMEN GO
-/// Simplified to use fixed 1280x720 values for guaranteed compatibility
+/// Supports dynamic bounds calculation based on image size for scrolling stages
 class DEFGenerator {
     
     /// Generate DEF file content from a stage document

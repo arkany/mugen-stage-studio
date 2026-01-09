@@ -3,7 +3,7 @@ import Cocoa
 import os.log
 
 /// Orchestrates the complete stage export process
-/// Simplified to use fixed 1280x720 resolution for guaranteed compatibility
+/// Supports dynamic image dimensions for scrolling stages with localcoord 1280x720
 class ExportController {
     
     private static let logger = Logger(subsystem: "com.mugen-stage-studio", category: "Export")
