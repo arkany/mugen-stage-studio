@@ -47,16 +47,18 @@ class ValidationEngine {
                 ))
             }
             
-            // Check camera bounds vs image size
-            let screenWidth = document.resolution.size.width
-            let maxPanX = (imageSize.width - screenWidth) / 2
-            
-            if CGFloat(abs(document.camera.boundLeft)) > maxPanX ||
-               CGFloat(document.camera.boundRight) > maxPanX {
-                warnings.append(ValidationResult.Issue(
-                    code: .boundsExceedImage,
-                    message: "Camera bounds exceed image width—may show gaps at edges"
-                ))
+            // Check camera bounds vs image size (only for custom resolution with scrolling)
+            if document.resolution == .custom, let screenSize = document.resolution.size ?? CGSize(width: 1280, height: 720) as CGSize? {
+                let screenWidth = screenSize.width
+                let maxPanX = (imageSize.width - screenWidth) / 2
+                
+                if CGFloat(abs(document.camera.boundLeft)) > maxPanX ||
+                   CGFloat(document.camera.boundRight) > maxPanX {
+                    warnings.append(ValidationResult.Issue(
+                        code: .boundsExceedImage,
+                        message: "Camera bounds exceed image width—may show gaps at edges"
+                    ))
+                }
             }
         }
         
@@ -71,7 +73,8 @@ class ValidationEngine {
         }
         
         // Check player positions - should be within visible screen area
-        let screenHalfWidth = Int(document.resolution.size.width / 2)
+        let screenWidth = document.resolution.size?.width ?? 1280
+        let screenHalfWidth = Int(screenWidth / 2)
         let leftBound = -screenHalfWidth + 50
         let rightBound = screenHalfWidth - 50
         

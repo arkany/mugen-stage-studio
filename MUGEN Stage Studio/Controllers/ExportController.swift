@@ -3,7 +3,7 @@ import Cocoa
 import os.log
 
 /// Orchestrates the complete stage export process
-/// Simplified to use fixed 1280x720 resolution for guaranteed compatibility
+/// Supports dynamic image dimensions for scrolling stages with localcoord 1280x720
 class ExportController {
     
     private static let logger = Logger(subsystem: "com.mugen-stage-studio", category: "Export")
@@ -12,6 +12,13 @@ class ExportController {
     static let stageWidth: Int = 1280
     static let stageHeight: Int = 720
     static let stageSize = CGSize(width: stageWidth, height: stageHeight)
+    
+    // Axis positioning ratio for MUGEN stages
+    // 0.43 (~43% from top) matches working stages and provides proper vertical alignment
+    private static let verticalAxisRatio: Double = 0.43
+    
+    // Maximum image dimension supported by Int16 in SFF format
+    private static let maxImageDimension: Int = 32767
     
     enum ExportError: LocalizedError {
         case noLayers
@@ -72,13 +79,13 @@ class ExportController {
             try? fileManager.removeItem(at: tempDir)
         }
         
-        // Generate and write SFF file
+        // Generate and write SFF file (returns actual image dimensions)
         let sffURL = stageFolder.appendingPathComponent("\(stageName).sff")
-        try writeSFF(for: document, to: sffURL)
+        let imageSize = try writeSFF(for: document, to: sffURL)
         
-        // Generate and write DEF file
+        // Generate and write DEF file with image dimensions for bounds calculation
         let defURL = stageFolder.appendingPathComponent("\(stageName).def")
-        try writeDEF(for: document, to: defURL)
+        try writeDEF(for: document, imageSize: imageSize, to: defURL)
         
         // Create ZIP file
         try createZip(from: stageFolder, to: destinationURL)
@@ -86,21 +93,22 @@ class ExportController {
     
     // MARK: - Private Methods
     
-    /// Resize/crop image to exactly 1280x720 for stage compatibility
-    private static func resizeImageToStageSize(_ image: NSImage) -> NSImage? {
-        let targetSize = stageSize
+    /// Resize/crop image to a specific size for fixed resolution export
+    private static func resizeImageToSize(_ image: NSImage, targetSize: CGSize) -> NSImage? {
+        let targetWidth = Int(targetSize.width)
+        let targetHeight = Int(targetSize.height)
         
         // Create bitmap with exact pixel dimensions
         guard let bitmapRep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
-            pixelsWide: stageWidth,
-            pixelsHigh: stageHeight,
+            pixelsWide: targetWidth,
+            pixelsHigh: targetHeight,
             bitsPerSample: 8,
             samplesPerPixel: 4,
             hasAlpha: true,
             isPlanar: false,
             colorSpaceName: .deviceRGB,
-            bytesPerRow: stageWidth * 4,
+            bytesPerRow: targetWidth * 4,
             bitsPerPixel: 32
         ) else {
             return nil
@@ -148,30 +156,67 @@ class ExportController {
         return result
     }
     
-    private static func writeSFF(for document: StageDocument, to url: URL) throws {
+    private static func writeSFF(for document: StageDocument, to url: URL) throws -> CGSize {
         guard let firstLayer = document.layers.first else {
             throw ExportError.noLayers
         }
         
-        logger.info("=== Starting Simplified SFF Export (1280x720) ===")
+        let originalImage = firstLayer.image
+        let stageImage: NSImage
+        let imageWidth: Int
+        let imageHeight: Int
         
-        // Resize image to exact stage dimensions
-        guard let stageImage = resizeImageToStageSize(firstLayer.image) else {
-            throw ExportError.spriteCreationFailed("Failed to resize image to stage size")
+        // Check if we should resize to fixed resolution or use original (custom)
+        if let fixedSize = document.resolution.size {
+            // Fixed resolution - resize/crop the image
+            logger.info("=== Starting SFF Export with Fixed Resolution \(Int(fixedSize.width))x\(Int(fixedSize.height)) ===")
+            
+            guard let resizedImage = resizeImageToSize(originalImage, targetSize: fixedSize) else {
+                throw ExportError.spriteCreationFailed("Failed to resize image to target size")
+            }
+            stageImage = resizedImage
+            imageWidth = Int(fixedSize.width)
+            imageHeight = Int(fixedSize.height)
+        } else {
+            // Custom resolution - use original image dimensions
+            stageImage = originalImage
+            
+            // Get actual pixel dimensions from the image
+            guard let tiffData = stageImage.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiffData) else {
+                throw ExportError.spriteCreationFailed("Failed to read image dimensions")
+            }
+            
+            imageWidth = bitmap.pixelsWide
+            imageHeight = bitmap.pixelsHigh
+            
+            logger.info("=== Starting SFF Export with Custom Dimensions \(imageWidth)x\(imageHeight) ===")
         }
         
-        logger.info("Stage image resized to: \(stageWidth)x\(stageHeight)")
+        // Validate image dimensions fit within Int16 range for SFF format
+        guard imageWidth > 0 && imageHeight > 0 else {
+            throw ExportError.spriteCreationFailed("Image dimensions must be positive")
+        }
+        guard imageWidth <= maxImageDimension && imageHeight <= maxImageDimension else {
+            throw ExportError.spriteCreationFailed("Image dimensions exceed maximum supported size (\(maxImageDimension)x\(maxImageDimension))")
+        }
+        
+        logger.info("Image size: \(imageWidth)x\(imageHeight)")
         
         var sprites: [SFFWriter.Sprite] = []
         
-        // Background sprite: 1280x720
-        // In MUGEN, the axis defines which point in the sprite aligns with the "start" position
-        // With start = 0, 0 in the DEF file:
-        // - axisX = 640 (center of image aligns with screen center X=0)
-        // - axisY = 0 (top of image aligns with camera Y=0, which is top of screen)
-        // This makes the 720px tall image fill from screen top to zoffset (660) + 60px below
-        let axisX: Int16 = 640
-        let axisY: Int16 = 0
+        // Calculate axis based on working stage analysis:
+        // Working stage (1536x1024) has axis (768, 1248) with zoffset=944
+        // Formula: axisX = imageWidth/2, axisY = imageHeight + (localcoordHeight - 75)
+        // This positions the sprite so characters stand at the correct ground level
+        let axisX: Int16
+        let axisY: Int16
+        
+        let localcoordHeight = 720
+        axisX = Int16(clamping: imageWidth / 2)
+        axisY = Int16(clamping: imageHeight + (localcoordHeight - 75))
+        
+        logger.info("Calculated axis: (\(axisX), \(axisY)) using formula: imageHeight + (localcoordHeight - 75)")
         
         do {
             let bgSprite = try SFFWriter.sprite(
@@ -213,10 +258,13 @@ class ExportController {
         } catch {
             throw ExportError.sffWriteFailed(error.localizedDescription)
         }
+        
+        // Return the actual image dimensions for DEF generation
+        return CGSize(width: imageWidth, height: imageHeight)
     }
     
-    private static func writeDEF(for document: StageDocument, to url: URL) throws {
-        let content = DEFGenerator.generate(from: document)
+    private static func writeDEF(for document: StageDocument, imageSize: CGSize, to url: URL) throws {
+        let content = DEFGenerator.generate(from: document, imageSize: imageSize)
         
         do {
             try content.write(to: url, atomically: true, encoding: .utf8)

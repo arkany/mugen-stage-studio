@@ -158,8 +158,14 @@ class CanvasView: NSView {
             context.strokePath()
         }
         
-        // Label at top - fixed export size
-        let label = "Export Area (1280×720)"
+        // Label at top - context-aware based on resolution type
+        let label: String
+        if document.resolution == .custom {
+            label = "Camera View (1280×720)"
+        } else {
+            let resSize = document.resolution.size ?? CGSize(width: 1280, height: 720)
+            label = "Export Area (\(Int(resSize.width))×\(Int(resSize.height)))"
+        }
         drawLabel(label, at: NSPoint(x: screenRect.minX + 5, y: screenRect.maxY + 8), color: screenFrameColor)
         
         // Note: Drag the green Ground line to move screen up/down
@@ -188,8 +194,13 @@ class CanvasView: NSView {
         drawHandle(at: NSPoint(x: boundsRect.maxX, y: boundsRect.midY), color: .systemBlue, in: context) // Right
         drawHandle(at: NSPoint(x: boundsRect.midX, y: boundsRect.maxY), color: .systemBlue, in: context) // Top
         
-        // Label showing bounds values
-        let boundsLabel = "Camera Bounds (L:\(document.camera.boundLeft) R:\(document.camera.boundRight) H:\(document.camera.boundHigh))"
+        // Label showing bounds values - context-aware based on resolution type
+        let boundsLabel: String
+        if document.resolution == .custom {
+            boundsLabel = "Full Canvas / Stage Bounds (L:\(document.camera.boundLeft) R:\(document.camera.boundRight) H:\(document.camera.boundHigh))"
+        } else {
+            boundsLabel = "Camera Bounds (L:\(document.camera.boundLeft) R:\(document.camera.boundRight) H:\(document.camera.boundHigh))"
+        }
         drawLabel(boundsLabel, at: NSPoint(x: boundsRect.minX + 5, y: boundsRect.maxY + 10), color: .systemBlue)
         
         context.restoreGState()
@@ -303,14 +314,15 @@ class CanvasView: NSView {
     }
     
     private func drawPreviewFrame(in context: CGContext) {
-        let screenSize = document.resolution.size
+        let screenSize = document.resolution.size ?? CGSize(width: 1280, height: 720)
+        let screenHeight = document.resolution.height ?? 720
         let centerX = bounds.width / 2 + previewOffset
         let groundY = groundLineY()
         
         // Screen frame at current preview position
         let screenRect = NSRect(
             x: centerX - screenSize.width / 2,
-            y: groundY - screenSize.height + CGFloat(document.resolution.height - document.groundLineY),
+            y: groundY - screenSize.height + CGFloat(screenHeight - document.groundLineY),
             width: screenSize.width,
             height: screenSize.height
         )
@@ -350,9 +362,32 @@ class CanvasView: NSView {
             return NSRect(x: canvasPadding, y: canvasPadding, width: 1280, height: 720)
         }
         
-        // Fixed export size: 1280x720
-        let targetWidth: CGFloat = 1280
-        let targetHeight: CGFloat = 720
+        // For Custom (scrolling) stages: show fixed 1280x720 viewport centered in canvas
+        // This represents what the player sees at any moment
+        if document.resolution == .custom {
+            let viewportWidth: CGFloat = 1280
+            let viewportHeight: CGFloat = 720
+            
+            // Center horizontally within the image
+            let xOffset = (imageSize.width - viewportWidth) / 2
+            
+            // Position vertically: ground should be near bottom of viewport
+            // For fighting games, viewport bottom should align close to image bottom
+            // Just a tiny margin (2%) to show a sliver of foreground
+            let yOffset = imageSize.height * 0.02
+            
+            return NSRect(
+                x: canvasPadding + max(0, xOffset),
+                y: canvasPadding + max(0, yOffset),
+                width: min(viewportWidth, imageSize.width),
+                height: min(viewportHeight, imageSize.height)
+            )
+        }
+        
+        // Fixed resolution: calculate crop rect that matches export behavior
+        let targetSize = document.resolution.size ?? CGSize(width: 1280, height: 720)
+        let targetWidth = targetSize.width
+        let targetHeight = targetSize.height
         let targetAspect = targetWidth / targetHeight
         
         // Calculate the crop rect that matches export behavior

@@ -160,12 +160,21 @@ class StageDocument: ObservableObject {
     
     /// Apply smart defaults based on image size
     func applyDefaults(for imageSize: CGSize) {
-        let screenWidth = resolution.size.width
-        let screenHeight = resolution.size.height
+        // Use fixed resolution size, or 1280x720 as localcoord for custom
+        let screenWidth = resolution.size?.width ?? 1280
+        let screenHeight = resolution.size?.height ?? 720
         
         // Ground line (zoffset): position from top of screen where floor is
-        // For a 720-height screen, floor at bottom = ~660 (leaves 60px margin)
-        groundLineY = Int(screenHeight) - 60
+        // For custom/scrolling stages: position relative to image, ground near bottom
+        // For fixed resolution: position within the viewport (720 - 60 = 660)
+        if resolution == .custom {
+            // Ground should be near the bottom of the image
+            // ~60px from the bottom of the actual image
+            groundLineY = Int(imageSize.height) - 60
+        } else {
+            // For fixed resolution, ground at bottom of viewport
+            groundLineY = Int(screenHeight) - 60
+        }
         
         // Camera bounds: how far camera can pan based on image vs screen size
         let cameraPanX = max(0, (imageSize.width - screenWidth) / 2)
@@ -281,15 +290,18 @@ enum Resolution: String, CaseIterable, Identifiable {
     case fullhd_1920x1080 = "1920×1080"
     case classic_320x240 = "320×240"
     case sd_640x480 = "640×480"
+    case custom = "Custom"
     
     var id: String { rawValue }
     
-    var size: CGSize {
+    /// Returns the fixed size for this resolution, or nil for custom
+    var size: CGSize? {
         switch self {
         case .hd_1280x720: return CGSize(width: 1280, height: 720)
         case .fullhd_1920x1080: return CGSize(width: 1920, height: 1080)
         case .classic_320x240: return CGSize(width: 320, height: 240)
         case .sd_640x480: return CGSize(width: 640, height: 480)
+        case .custom: return nil
         }
     }
     
@@ -299,11 +311,17 @@ enum Resolution: String, CaseIterable, Identifiable {
         case .fullhd_1920x1080: return "Full HD (1920×1080)"
         case .classic_320x240: return "Classic (320×240)"
         case .sd_640x480: return "SD (640×480)"
+        case .custom: return "Custom (Original Size)"
         }
     }
     
-    var width: Int { Int(size.width) }
-    var height: Int { Int(size.height) }
+    var width: Int? { size.map { Int($0.width) } }
+    var height: Int? { size.map { Int($0.height) } }
+    
+    /// Whether this resolution allows scrolling (custom always does, fixed resolutions don't)
+    var allowsScrolling: Bool {
+        self == .custom
+    }
 }
 
 enum Engine: String, CaseIterable, Identifiable {
