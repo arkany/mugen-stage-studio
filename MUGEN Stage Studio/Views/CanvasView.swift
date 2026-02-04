@@ -160,7 +160,9 @@ class CanvasView: NSView {
         
         // Label at top - context-aware based on resolution type
         let label: String
-        if document.resolution == .custom {
+        if document.resolution == .scrolling_320x240 {
+            label = "Camera View (320×240 coords)"
+        } else if document.resolution == .custom {
             label = "Camera View (1280×720)"
         } else {
             let resSize = document.resolution.size ?? CGSize(width: 1280, height: 720)
@@ -196,7 +198,7 @@ class CanvasView: NSView {
         
         // Label showing bounds values - context-aware based on resolution type
         let boundsLabel: String
-        if document.resolution == .custom {
+        if document.resolution.allowsScrolling {
             boundsLabel = "Full Canvas / Stage Bounds (L:\(document.camera.boundLeft) R:\(document.camera.boundRight) H:\(document.camera.boundHigh))"
         } else {
             boundsLabel = "Camera Bounds (L:\(document.camera.boundLeft) R:\(document.camera.boundRight) H:\(document.camera.boundHigh))"
@@ -362,9 +364,9 @@ class CanvasView: NSView {
             return NSRect(x: canvasPadding, y: canvasPadding, width: 1280, height: 720)
         }
         
-        // For Custom (scrolling) stages: show fixed 1280x720 viewport centered in canvas
+        // For scrolling stages: show fixed 1280x720 viewport centered in canvas
         // This represents what the player sees at any moment
-        if document.resolution == .custom {
+        if document.resolution.allowsScrolling {
             let viewportWidth: CGFloat = 1280
             let viewportHeight: CGFloat = 720
             

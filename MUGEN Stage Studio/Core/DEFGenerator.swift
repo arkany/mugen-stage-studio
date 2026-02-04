@@ -24,25 +24,41 @@ class DEFGenerator {
         let zoffset: Int
         let isScrolling: Bool
         
-        if document.resolution == .custom {
+        if document.resolution == .scrolling_320x240 {
+            // 320×240 scrolling stage — the MUGEN default localcoord
+            localcoordWidth = 320
+            localcoordHeight = 240
+
+            // zoffset: proportional ground position in 240px space
+            // e.g. groundLineY near bottom of a 1024px image → ~220 in 240 space
+            zoffset = Int(Double(document.groundLineY) / Double(imageHeight) * 240.0)
+
+            // Camera bounds from document (already in localcoord space from applyDefaults)
+            boundleft = document.camera.boundLeft
+            boundright = document.camera.boundRight
+            boundhigh = document.camera.boundHigh
+            boundlow = 0
+
+            isScrolling = true
+        } else if document.resolution == .custom {
             // Custom resolution - calculate dynamic bounds for scrolling
             localcoordWidth = 1280
             localcoordHeight = 720
-            
+
             // Camera pan distance = how much image extends beyond screen
             let cameraPanX = max(0, (imageWidth - localcoordWidth) / 2)
             boundleft = -cameraPanX
             boundright = cameraPanX
-            
+
             // Vertical bounds - allow camera to pan up if image is taller
             let cameraPanY = max(0, imageHeight - localcoordHeight)
             boundhigh = -cameraPanY  // Negative = can look up
             boundlow = 0
-            
+
             // zoffset matches the axis Y value for proper alignment
             // Characters stand at zoffset from top of screen
             zoffset = imageHeight + (localcoordHeight - 75)
-            
+
             isScrolling = cameraPanX > 0 || cameraPanY > 0
         } else {
             // Fixed resolution - no scrolling
@@ -82,21 +98,45 @@ class DEFGenerator {
         lines.append("boundright = \(boundright)")
         lines.append("boundhigh = \(boundhigh)")
         lines.append("boundlow = \(boundlow)")
-        lines.append("tension = 50")
-        lines.append("verticalfollow = \(isScrolling ? "0.85" : "0.2")")
-        lines.append("floortension = \(isScrolling ? "200" : "160")")
+        if document.resolution == .scrolling_320x240 {
+            lines.append("tension = \(document.camera.tension)")
+            lines.append("verticalfollow = \(String(format: "%.2f", document.camera.verticalFollow))")
+            lines.append("floortension = \(document.camera.floorTension)")
+        } else {
+            lines.append("tension = 50")
+            lines.append("verticalfollow = \(isScrolling ? "0.85" : "0.2")")
+            lines.append("floortension = \(isScrolling ? "200" : "160")")
+        }
         lines.append("")
-        
+
         // [PlayerInfo] section
+        let p1startx: Int
+        let p2startx: Int
+        let leftbound: Int
+        let rightbound: Int
+
+        if document.resolution == .scrolling_320x240 {
+            p1startx = document.players.p1X
+            p2startx = document.players.p2X
+            // Ensure players can walk the full stage width
+            leftbound = -max(1000, abs(boundleft) + 500)
+            rightbound = max(1000, abs(boundright) + 500)
+        } else {
+            p1startx = -200
+            p2startx = 200
+            leftbound = -590
+            rightbound = 590
+        }
+
         lines.append("[PlayerInfo]")
-        lines.append("p1startx = -200")
+        lines.append("p1startx = \(p1startx)")
         lines.append("p1starty = 0")
         lines.append("p1facing = 1")
-        lines.append("p2startx = 200")
+        lines.append("p2startx = \(p2startx)")
         lines.append("p2starty = 0")
         lines.append("p2facing = -1")
-        lines.append("leftbound = -590")
-        lines.append("rightbound = 590")
+        lines.append("leftbound = \(leftbound)")
+        lines.append("rightbound = \(rightbound)")
         lines.append("")
         
         // [Bound] section
@@ -107,14 +147,17 @@ class DEFGenerator {
         
         // [StageInfo] section
         lines.append("[StageInfo]")
-        // zoffset: vertical position where characters' feet touch the ground
-        // For scrolling stages: imageHeight - 75 (accounts for floor margin)
-        // For fixed stages: 660 (near bottom of 720-height screen)
         lines.append("zoffset = \(zoffset)")
         lines.append("autoturn = 1")
         lines.append("resetBG = 1")
-        lines.append("localcoord = \(localcoordWidth), \(localcoordHeight)")
-        lines.append("portraitscale = 4")
+        if document.resolution == .scrolling_320x240 {
+            // 320×240 is the MUGEN default — omit localcoord line
+            // No portraitscale needed for default coord space
+            lines.append("localcoord = 320, 240")
+        } else {
+            lines.append("localcoord = \(localcoordWidth), \(localcoordHeight)")
+            lines.append("portraitscale = 4")
+        }
         lines.append("")
         
         // [Shadow] section

@@ -47,11 +47,18 @@ class ValidationEngine {
                 ))
             }
             
-            // Check camera bounds vs image size (only for custom resolution with scrolling)
-            if document.resolution == .custom, let screenSize = document.resolution.size ?? CGSize(width: 1280, height: 720) as CGSize? {
-                let screenWidth = screenSize.width
-                let maxPanX = (imageSize.width - screenWidth) / 2
-                
+            // Check camera bounds vs image size (only for scrolling resolutions)
+            if document.resolution.allowsScrolling {
+                let screenWidth: CGFloat
+                if document.resolution == .scrolling_320x240 {
+                    screenWidth = 320
+                } else {
+                    screenWidth = document.resolution.size?.width ?? 1280
+                }
+
+                let scaleFactor: CGFloat = document.resolution == .scrolling_320x240 ? 4.0 : 1.0
+                let maxPanX = (imageSize.width / scaleFactor - screenWidth) / 2
+
                 if CGFloat(abs(document.camera.boundLeft)) > maxPanX ||
                    CGFloat(document.camera.boundRight) > maxPanX {
                     warnings.append(ValidationResult.Issue(
@@ -73,8 +80,8 @@ class ValidationEngine {
         }
         
         // Check player positions - should be within visible screen area
-        let screenWidth = document.resolution.size?.width ?? 1280
-        let screenHalfWidth = Int(screenWidth / 2)
+        let playerScreenWidth: CGFloat = document.resolution == .scrolling_320x240 ? 320 : (document.resolution.size?.width ?? 1280)
+        let screenHalfWidth = Int(playerScreenWidth / 2)
         let leftBound = -screenHalfWidth + 50
         let rightBound = screenHalfWidth - 50
         

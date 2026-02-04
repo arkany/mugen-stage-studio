@@ -239,17 +239,17 @@ class MainViewController: NSViewController {
         alert.informativeText = "The image (\(imageWidth)×\(imageHeight)) doesn't match the selected resolution (\(Int(fixedSize.width))×\(Int(fixedSize.height))).\n\nWould you like to crop it to fit, or use the original size for a scrolling stage?"
         alert.alertStyle = .informational
         
-        alert.addButton(withTitle: "Use Original (Scrolling)")
+        alert.addButton(withTitle: "Use as Scrolling Stage (320×240)")
         alert.addButton(withTitle: "Crop to \(currentResolution.rawValue)")
         alert.addButton(withTitle: "Cancel")
-        
+
         alert.beginSheetModal(for: view.window!) { [weak self] response in
             guard let self = self else { return }
-            
+
             switch response {
             case .alertFirstButtonReturn:
-                // Use custom/original size
-                self.stageDocument.resolution = .custom
+                // Use 320×240 scrolling stage
+                self.stageDocument.resolution = .scrolling_320x240
                 self.performImageImport(image: image, imageSize: imageSize, url: url)
                 
             case .alertSecondButtonReturn:

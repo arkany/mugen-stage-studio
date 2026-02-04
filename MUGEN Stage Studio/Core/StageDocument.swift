@@ -160,10 +160,48 @@ class StageDocument: ObservableObject {
     
     /// Apply smart defaults based on image size
     func applyDefaults(for imageSize: CGSize) {
+        if resolution == .scrolling_320x240 {
+            // 320×240 scrolling stage defaults
+            // Scale factor: standard render resolution is 1280x720, localcoord is 320x240
+            let scaleFactor: CGFloat = 4.0
+
+            // Ground near bottom of image (~60px from bottom in sprite pixel coords)
+            groundLineY = Int(imageSize.height) - 60
+
+            // Camera bounds in localcoord (320×240) space
+            let halfExtraWidth = (imageSize.width / scaleFactor - 320) / 2
+            let cameraPanY = max(0, imageSize.height / scaleFactor - 240)
+
+            camera.boundsRect = CGRect(
+                x: -halfExtraWidth,
+                y: -cameraPanY,
+                width: halfExtraWidth * 2,
+                height: cameraPanY
+            )
+
+            // Player positions in localcoord space
+            players.p1X = -70
+            players.p2X = 70
+
+            // Camera settings tuned for scrolling
+            camera.verticalFollow = 0.75
+            camera.floorTension = 60
+
+            // Background layer position for canvas display (centered, bottom-aligned)
+            if var layer = layers.first {
+                layer.position = CGPoint(
+                    x: -imageSize.width / 2,
+                    y: -(imageSize.height - 720)
+                )
+                layers[0] = layer
+            }
+            return
+        }
+
         // Use fixed resolution size, or 1280x720 as localcoord for custom
         let screenWidth = resolution.size?.width ?? 1280
         let screenHeight = resolution.size?.height ?? 720
-        
+
         // Ground line (zoffset): position from top of screen where floor is
         // For custom/scrolling stages: position relative to image, ground near bottom
         // For fixed resolution: position within the viewport (720 - 60 = 660)
@@ -175,18 +213,18 @@ class StageDocument: ObservableObject {
             // For fixed resolution, ground at bottom of viewport
             groundLineY = Int(screenHeight) - 60
         }
-        
+
         // Camera bounds: how far camera can pan based on image vs screen size
         let cameraPanX = max(0, (imageSize.width - screenWidth) / 2)
         let cameraPanY = max(0, imageSize.height - screenHeight)
-        
+
         camera.boundsRect = CGRect(
             x: -cameraPanX,
             y: -cameraPanY,
             width: cameraPanX * 2,
             height: cameraPanY
         )
-        
+
         // Background layer position for canvas display (centered, bottom-aligned)
         if var layer = layers.first {
             layer.position = CGPoint(
@@ -195,7 +233,7 @@ class StageDocument: ObservableObject {
             )
             layers[0] = layer
         }
-        
+
         // Player positions: use reasonable spacing (within half screen width)
         let playerSpacing = min(200, Int(screenWidth / 4))
         players.p1X = -playerSpacing
@@ -290,6 +328,7 @@ enum Resolution: String, CaseIterable, Identifiable {
     case fullhd_1920x1080 = "1920×1080"
     case classic_320x240 = "320×240"
     case sd_640x480 = "640×480"
+    case scrolling_320x240 = "320×240 (Scrolling)"
     case custom = "Custom"
     
     var id: String { rawValue }
@@ -301,6 +340,7 @@ enum Resolution: String, CaseIterable, Identifiable {
         case .fullhd_1920x1080: return CGSize(width: 1920, height: 1080)
         case .classic_320x240: return CGSize(width: 320, height: 240)
         case .sd_640x480: return CGSize(width: 640, height: 480)
+        case .scrolling_320x240: return nil
         case .custom: return nil
         }
     }
@@ -311,6 +351,7 @@ enum Resolution: String, CaseIterable, Identifiable {
         case .fullhd_1920x1080: return "Full HD (1920×1080)"
         case .classic_320x240: return "Classic (320×240)"
         case .sd_640x480: return "SD (640×480)"
+        case .scrolling_320x240: return "Scrolling (320×240)"
         case .custom: return "Custom (Original Size)"
         }
     }
@@ -320,7 +361,7 @@ enum Resolution: String, CaseIterable, Identifiable {
     
     /// Whether this resolution allows scrolling (custom always does, fixed resolutions don't)
     var allowsScrolling: Bool {
-        self == .custom
+        self == .custom || self == .scrolling_320x240
     }
 }
 

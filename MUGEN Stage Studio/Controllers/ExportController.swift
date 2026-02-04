@@ -205,16 +205,21 @@ class ExportController {
         
         var sprites: [SFFWriter.Sprite] = []
         
-        // Calculate axis based on working stage analysis:
-        // Working stage (1536x1024) has axis (768, 1248) with zoffset=944
-        // Formula: axisX = imageWidth/2, axisY = imageHeight + (localcoordHeight - 75)
-        // This positions the sprite so characters stand at the correct ground level
+        // Calculate axis based on resolution type
         let axisX: Int16
         let axisY: Int16
-        
-        let localcoordHeight = 720
-        axisX = Int16(clamping: imageWidth / 2)
-        axisY = Int16(clamping: imageHeight + (localcoordHeight - 75))
+
+        if document.resolution == .scrolling_320x240 {
+            // For 320×240 scrolling: axis X at center, axis Y at ground line pixel row
+            axisX = Int16(clamping: imageWidth / 2)
+            axisY = Int16(clamping: document.groundLineY)
+        } else {
+            // For custom (1280×720) and fixed resolutions:
+            // Formula: axisX = imageWidth/2, axisY = imageHeight + (localcoordHeight - 75)
+            let localcoordHeight = 720
+            axisX = Int16(clamping: imageWidth / 2)
+            axisY = Int16(clamping: imageHeight + (localcoordHeight - 75))
+        }
         
         logger.info("Calculated axis: (\(axisX), \(axisY)) using formula: imageHeight + (localcoordHeight - 75)")
         
