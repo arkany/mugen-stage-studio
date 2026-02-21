@@ -291,6 +291,162 @@ let bgStartY = -(imgHeight - screenHeight)
 | Animated backgrounds | Low | Frame sequence import |
 | Fighter Factory import | Low | Open existing .def/.sff |
 
+---
+
+## IKEMEN GO Full Feature Parity Roadmap
+
+Goal: export every stage type that ships with a default IKEMEN GO installation. The sections below enumerate all parameters and BG element types drawn from the IKEMEN GO stock stages (`stage0`, `stage0-720`, and bundled extras). The data model already stores most of these — implementation gaps are in DEFGenerator and ExportController.
+
+### Stage Types to Support
+
+| Stage Type | Description | Key Parameters | Status |
+|---|---|---|---|
+| **Static / Training room** | Single non-scrolling BG, no camera pan | `boundleft = boundright = 0`, `delta = 1,1` | MVP (export broken — values hardcoded) |
+| **Scrolling horizontal** | Background wider than screen, camera pans left/right | `boundleft < 0 < boundright`, image width > localcoord width | Fix ExportController (no force-crop) |
+| **Scrolling vertical** | Background taller than screen, camera tracks vertically | `boundhigh < 0`, `verticalfollow > 0` | Fix ExportController |
+| **Parallax** | Multiple layers with different `delta` values for depth | Per-layer `delta.x/y` ≠ 1, multi-layer DEF | Fix DEFGenerator (multi-layer iteration) |
+| **Zoom** | Camera zooms in/out during gameplay | `startzoom`, `zoomin`, `zoomout`, `zoomanchor` | Fix DEFGenerator (zoom fields not written) |
+| **Animated BG** | BG elements with frame animation via action number | `type = anim`, `actionno = N`, `[Begin Action N]` blocks | v1.2+ (requires animation model) |
+| **Parallax-type ground** | Perspective-corrected ground plane | `type = parallax`, dual `xscale`, dual `width` | v1.2+ (requires parallax-type model) |
+| **Foreground layer** | BG element drawn in front of characters | `layerno = 1` | v1.1 (model has `layerIndex`, export missing) |
+
+### Target Resolutions (IKEMEN GO Stock)
+
+| Preset | localcoord | Use case |
+|---|---|---|
+| Classic | 320×240 | WinMUGEN / MUGEN 1.0 compatibility |
+| SD | 640×480 | MUGEN 1.1 standard |
+| HD | 1280×720 | IKEMEN GO default (stage0-720) |
+| Full HD | 1920×1080 | Modern screenpacks |
+
+### Full DEF Parameter Reference
+
+All parameters that IKEMEN GO reads from a stage DEF. Checked items are already in the data model; implementation gaps are noted.
+
+#### [Info]
+- [x] `name`
+- [x] `displayname`
+- [x] `mugenversion` (varies by engine target)
+- [ ] `ikemenversion = 1.0` — not yet written when targetEngine == .ikemenGo
+- [x] `author`
+
+#### [Camera]
+- [x] `startx`, `starty`
+- [x] `boundleft`, `boundright`
+- [x] `boundhigh`, `boundlow`
+- [x] `tension`
+- [x] `verticalfollow`
+- [x] `floortension`
+- [ ] `overdrawlow` — IKEMEN GO extension, not yet in model
+- [ ] `underlaylow` — IKEMEN GO extension, not yet in model
+- [x] `startzoom` — in model, not yet written to DEF
+- [x] `zoomin` — in model, not yet written to DEF
+- [x] `zoomout` — in model, not yet written to DEF
+- [ ] `zoomanchor` — IKEMEN GO extension, not yet in model
+
+#### [PlayerInfo]
+- [x] `p1startx`, `p1starty`, `p1facing`
+- [x] `p2startx`, `p2starty`, `p2facing`
+- [x] `leftbound`, `rightbound`
+
+#### [Bound]
+- [x] `screenleft`, `screenright`
+
+#### [StageInfo]
+- [x] `zoffset`
+- [x] `autoturn`
+- [x] `resetBG`
+- [x] `localcoord`
+- [x] `portraitscale` — written, correct
+- [ ] `hires` — MUGEN 1.1 flag, not yet in model
+
+#### [Shadow]
+- [x] `intensity`
+- [x] `yscale`
+- [ ] `color` — RGB triple, not yet in model
+- [ ] `fade.range` — IKEMEN GO extension, not yet in model
+
+#### [Reflection]
+- [ ] `reflect` — not yet in model (always writes 0)
+- [ ] `reflectpos` — IKEMEN GO extension
+
+#### [Music]
+- [ ] `bgmusic` — not yet in model
+- [ ] `bgvolume` — not yet in model
+
+#### [BGDef]
+- [x] `spr`
+- [x] `debugbg`
+
+#### [BG N] — Per-element properties
+
+| Property | In model | In DEF export | Notes |
+|---|---|---|---|
+| `type` | ✗ (always normal) | hardcoded `normal` | Need `BGType` enum: normal, anim, parallax |
+| `spriteno` | ✓ (group 0, index 0) | hardcoded `0, 0` | |
+| `start` | ✓ `layer.position` | hardcoded `0, 0` | |
+| `delta` | ✓ `layer.delta` | hardcoded `1, 1` | |
+| `tile` | ✓ `layer.tiling` | hardcoded `0, 0` | |
+| `tilesize` | ✗ | not written | v1.2 |
+| `layerno` | ✓ `layer.layerIndex` | hardcoded `0` | |
+| `mask` | ✗ | hardcoded `0` | v1.1 |
+| `trans` | ✗ | not written | v1.1: none/add/sub/add1/addalpha |
+| `alpha` | ✗ | not written | v1.2: for addalpha trans |
+| `window` | ✗ | not written | v1.2: clipping rect |
+| `windowdelta` | ✗ | not written | v1.2 |
+| `xscale` | ✗ | not written | v1.2 |
+| `yscale` | ✗ | not written | v1.2 |
+| `id` | ✗ | not written | v1.2: for controllers |
+| `actionno` | ✗ | not written | v1.2: for anim type |
+
+#### [Begin Action N] — Animated BG actions
+- [ ] Full action/frame animation system — v1.2+
+
+### MUGEN Camera Rendering Formula
+
+The canonical BG element screen position formula that must be implemented in `MUGENRenderer.swift` and used in the live preview:
+
+```
+screenX = (localcoord.width / 2) + start.x - (camera.x * delta.x)
+screenY = zoffset + start.y - (camera.y * delta.y)
+```
+
+Where:
+- `camera.x` ranges from `boundleft` to `boundright` (default rest = `startx = 0`)
+- `camera.y` ranges from `boundhigh` to `boundlow` (default rest = `starty = 0`)
+- `localcoord` origin is top-left; screen center is at `localcoord.width / 2`
+- The sprite's axis point lands at `(screenX, screenY)` in localcoord space
+
+### SFF Sprite Group Conventions
+
+| Group | Index | Content |
+|---|---|---|
+| 0 | 0 | Primary background layer |
+| 0 | 1+ | Additional BG layers |
+| 9000 | 1 | Stage select thumbnail (240×100) |
+
+### v1.1 Implementation Order
+
+1. Fix `DEFGenerator` — read all fields from model (boundleft/right, zoffset, players, resolution, shadow, all BG layer fields)
+2. Fix `ExportController` — stop force-cropping images; export at natural size; iterate all layers
+3. Implement `MUGENRenderer` — canonical BG position formula as pure, testable function
+4. Wire `MUGENRenderer` into `CanvasView` preview — background moves, not the frame
+5. Add camera scrub slider to preview mode
+6. Add `overdrawlow`, `underlaylow`, `zoomanchor` to `CameraSettings`
+7. Add `color`, `fade.range` to `ShadowSettings`
+8. Add `hires` to `StageDocument`
+9. Add `[Music]` section — `bgmusic` + `bgvolume` fields
+10. Add `trans`, `mask` to `BackgroundLayer` (v1.1 BG element properties)
+
+### v1.2 Implementation Order
+
+1. Add `BGType` enum (normal / anim / parallax) to `BackgroundLayer`
+2. Animated BG: `actionno`, `[Begin Action N]` block generation
+3. Parallax-type: dual `xscale`/`width` fields for perspective ground
+4. Remaining BG properties: `window`, `windowdelta`, `xscale`, `yscale`, `id`, `alpha`, `tilesize`
+5. `[Reflection]` full support: `reflect`, `reflectpos`
+6. Fighter Factory / existing .def + .sff import
+
 ### Validation Rules
 
 | Rule | Severity | Message |

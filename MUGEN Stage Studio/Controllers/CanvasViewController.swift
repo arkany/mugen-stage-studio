@@ -22,8 +22,11 @@ class CanvasViewController: NSViewController {
     var selectedLayer: BackgroundLayer?
     
     private var isPreviewMode = false
-    private var previewTimer: Timer?
-    private var previewProgress: CGFloat = 0
+
+    // Camera scrub slider shown in preview mode
+    private var cameraSliderContainer: NSView!
+    private var cameraSlider: NSSlider!
+    private var cameraSliderLabel: NSTextField!
     
     // Zoom
     private var zoomLevel: CGFloat = 1.0 {
@@ -59,6 +62,7 @@ class CanvasViewController: NSViewController {
         setupCanvasView()
         setupDropTarget()
         setupZoomControls()
+        setupCameraSlider()
         setupGestureRecognizers()
     }
     
@@ -156,6 +160,55 @@ class CanvasViewController: NSViewController {
         ])
     }
     
+    private func setupCameraSlider() {
+        // Container bar shown only in preview mode, sits at the bottom of the scroll view
+        cameraSliderContainer = NSView()
+        cameraSliderContainer.wantsLayer = true
+        cameraSliderContainer.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.9).cgColor
+        cameraSliderContainer.translatesAutoresizingMaskIntoConstraints = false
+        cameraSliderContainer.isHidden = true
+        view.addSubview(cameraSliderContainer)
+
+        // Label on the left
+        cameraSliderLabel = NSTextField(labelWithString: "Camera X: 0")
+        cameraSliderLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        cameraSliderLabel.textColor = .labelColor
+        cameraSliderLabel.translatesAutoresizingMaskIntoConstraints = false
+        cameraSliderContainer.addSubview(cameraSliderLabel)
+
+        // Slider spanning the middle
+        cameraSlider = NSSlider(value: 0, minValue: -500, maxValue: 500, target: self, action: #selector(cameraSliderChanged(_:)))
+        cameraSlider.sliderType = .linear
+        cameraSlider.tickMarkPosition = .below
+        cameraSlider.numberOfTickMarks = 5
+        cameraSlider.translatesAutoresizingMaskIntoConstraints = false
+        cameraSliderContainer.addSubview(cameraSlider)
+
+        NSLayoutConstraint.activate([
+            // Container pinned to bottom of view, above zoom label row
+            cameraSliderContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            cameraSliderContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            cameraSliderContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            cameraSliderContainer.heightAnchor.constraint(equalToConstant: 36),
+
+            // Label on the left with padding
+            cameraSliderLabel.leadingAnchor.constraint(equalTo: cameraSliderContainer.leadingAnchor, constant: 12),
+            cameraSliderLabel.centerYAnchor.constraint(equalTo: cameraSliderContainer.centerYAnchor),
+            cameraSliderLabel.widthAnchor.constraint(equalToConstant: 130),
+
+            // Slider fills the remaining space
+            cameraSlider.leadingAnchor.constraint(equalTo: cameraSliderLabel.trailingAnchor, constant: 8),
+            cameraSlider.trailingAnchor.constraint(equalTo: cameraSliderContainer.trailingAnchor, constant: -12),
+            cameraSlider.centerYAnchor.constraint(equalTo: cameraSliderContainer.centerYAnchor),
+        ])
+    }
+
+    @objc private func cameraSliderChanged(_ sender: NSSlider) {
+        let x = CGFloat(sender.doubleValue)
+        cameraSliderLabel.stringValue = String(format: "Camera X: %+.0f", x)
+        canvasView.previewCameraX = x
+    }
+
     private func setupGestureRecognizers() {
         // Pinch to zoom
         let magnification = NSMagnificationGestureRecognizer(target: self, action: #selector(handleMagnification(_:)))
@@ -178,11 +231,16 @@ class CanvasViewController: NSViewController {
     func setPreviewMode(_ enabled: Bool) {
         isPreviewMode = enabled
         canvasView.setPreviewMode(enabled)
-        
+        cameraSliderContainer.isHidden = !enabled
+
         if enabled {
-            startPreviewAnimation()
-        } else {
-            stopPreviewAnimation()
+            // Range the slider from boundleft to boundright
+            let cam = document.camera
+            cameraSlider.minValue = Double(cam.boundLeft)
+            cameraSlider.maxValue = Double(cam.boundRight)
+            cameraSlider.doubleValue = 0
+            cameraSliderLabel.stringValue = "Camera X: +0"
+            canvasView.previewCameraX = 0
         }
     }
     
@@ -284,34 +342,6 @@ class CanvasViewController: NSViewController {
         zoomLabel.stringValue = "\(percentage)%"
     }
     
-    private func startPreviewAnimation() {
-        previewProgress = 0
-        previewTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
-            self?.updatePreviewAnimation()
-        }
-    }
-    
-    private func stopPreviewAnimation() {
-        previewTimer?.invalidate()
-        previewTimer = nil
-        previewProgress = 0
-        canvasView.setPreviewOffset(0)
-    }
-    
-    private func updatePreviewAnimation() {
-        // Animate camera pan across full bounds (2 second loop)
-        previewProgress += 1.0 / 120.0  // 2 seconds at 60fps
-        if previewProgress > 1.0 {
-            previewProgress = 0
-        }
-        
-        // Sinusoidal motion for smooth camera pan
-        let normalizedProgress = sin(previewProgress * .pi * 2) * 0.5 + 0.5
-        let panRange = CGFloat(document.camera.boundRight - document.camera.boundLeft)
-        let offset = CGFloat(document.camera.boundLeft) + panRange * normalizedProgress
-        
-        canvasView.setPreviewOffset(offset)
-    }
 }
 
 // MARK: - CanvasViewDelegate

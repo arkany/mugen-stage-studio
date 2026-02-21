@@ -1,0 +1,77 @@
+; IKEMEN GO default stage — stage0-720
+; Used as a known-good fixture for round-trip and spec compliance tests.
+; Values match the IKEMEN GO distribution (https://github.com/ikemen-engine/Ikemen-GO)
+
+[Info]
+name = "KFM Stage 720"
+displayname = "KFM Stage 720"
+mugenversion = 1.1
+ikemenversion = 1.0
+author = "Elecbyte"
+
+[Camera]
+startx = 0
+starty = 0
+boundleft = -184
+boundright = 184
+boundhigh = -25
+boundlow = 0
+tension = 50
+verticalfollow = 0.2
+floortension = 160
+overdrawlow = 0
+underlaylow = 0
+startzoom = 1
+zoomin = 1
+zoomout = 0.75
+
+[PlayerInfo]
+p1startx = -70
+p1starty = 0
+p1facing = 1
+p2startx = 70
+p2starty = 0
+p2facing = -1
+leftbound = -740
+rightbound = 740
+
+[Bound]
+screenleft = 15
+screenright = 15
+
+[StageInfo]
+zoffset = 660
+autoturn = 1
+resetBG = 1
+localcoord = 1280, 720
+portraitscale = 4
+
+[Shadow]
+intensity = 128
+color = 0, 0, 0
+yscale = 0.4
+fade.range = -400, -100
+
+[Reflection]
+reflect = 0
+
+[Music]
+; bgmusic =
+; bgvolume = 100
+
+[BGDef]
+spr = stages/stage0-720/stage0-720.sff
+debugbg = 0
+
+[BG 0]
+type = normal
+spriteno = 0, 0
+start = 0, 0
+delta = 1, 1
+tile = 0, 0
+layerno = 0
+mask = 0
+
+; Stage select thumbnail
+[Begin Action 9000]
+9000,1, 0,0, -1

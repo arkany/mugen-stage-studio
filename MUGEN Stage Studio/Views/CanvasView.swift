@@ -35,7 +35,11 @@ class CanvasView: NSView {
     private var dragStartRect: CGRect = .zero
     
     private var isPreviewMode = false
-    private var previewOffset: CGFloat = 0
+
+    /// Camera X position in MUGEN localcoord units, driven by the preview scrub slider.
+    var previewCameraX: CGFloat = 0 {
+        didSet { needsDisplay = true }
+    }
     
     // Visual constants
     private let handleSize: CGFloat = 10
@@ -76,19 +80,16 @@ class CanvasView: NSView {
             drawEmptyState(in: context)
             return
         }
-        
-        // Draw background layers
-        drawBackgroundLayers(in: context)
-        
-        if !isPreviewMode {
-            // Draw overlays (edit mode only)
+
+        if isPreviewMode {
+            drawPreviewLayers(in: context)
+            drawPreviewOverlay(in: context)
+        } else {
+            drawBackgroundLayers(in: context)
             drawScreenFrame(in: context)
             drawCameraBounds(in: context)
             drawGroundLine(in: context)
             drawPlayerMarkers(in: context)
-        } else {
-            // Preview mode - just show the screen frame at current offset
-            drawPreviewFrame(in: context)
         }
     }
     
@@ -126,9 +127,50 @@ class CanvasView: NSView {
     }
     
     private func drawBackgroundLayers(in context: CGContext) {
+        // Edit mode: draw layers at raw image positions so the full image is visible.
         for layer in document.layers where layer.visible {
             let imageRect = imageRectForLayer(layer)
             layer.image.draw(in: imageRect)
+        }
+    }
+
+    /// Draw layers in preview mode using the MUGEN BG element position formula.
+    private func drawPreviewLayers(in context: CGContext) {
+        let screenRect = screenFrameRect()
+        let localcoord = CGSize(
+            width: CGFloat(document.resolution.width),
+            height: CGFloat(document.resolution.height)
+        )
+        let zoffset = CGFloat(document.groundLineY)
+        let camera = CGPoint(x: previewCameraX, y: 0)
+
+        for layer in document.layers where layer.visible {
+            // Use bitmap pixel dimensions so coordinates match the SFF sprite size.
+            guard let tiff = layer.image.tiffRepresentation,
+                  let rep = NSBitmapImageRep(data: tiff) else { continue }
+            let spriteSize = CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
+
+            // The sprite axis: center-X, top-Y — matching ExportController's axisX=width/2, axisY=0
+            let axisOffset = CGPoint(x: spriteSize.width / 2, y: 0)
+
+            let screenPos = MUGENRenderer.screenPosition(
+                start: layer.position,
+                delta: layer.delta,
+                camera: camera,
+                localcoord: localcoord,
+                zoffset: zoffset
+            )
+            let localSpriteRect = MUGENRenderer.spriteRect(
+                screenPosition: screenPos,
+                spriteSize: spriteSize,
+                axisOffset: axisOffset
+            )
+            let canvasSpriteRect = MUGENRenderer.canvasRect(
+                from: localSpriteRect,
+                canvasScreenRect: screenRect,
+                localcoord: localcoord
+            )
+            layer.image.draw(in: canvasSpriteRect)
         }
     }
     
@@ -302,35 +344,39 @@ class CanvasView: NSView {
         attributedString.draw(at: point)
     }
     
-    private func drawPreviewFrame(in context: CGContext) {
-        let screenSize = document.resolution.size
-        let centerX = bounds.width / 2 + previewOffset
-        let groundY = groundLineY()
-        
-        // Screen frame at current preview position
-        let screenRect = NSRect(
-            x: centerX - screenSize.width / 2,
-            y: groundY - screenSize.height + CGFloat(document.resolution.height - document.groundLineY),
-            width: screenSize.width,
-            height: screenSize.height
-        )
-        
-        // Dim areas outside screen
+    /// Letterbox dim + viewport border drawn on top of the MUGEN-rendered preview layers.
+    private func drawPreviewOverlay(in context: CGContext) {
+        let screenRect = screenFrameRect()
+
+        // Dim areas outside the viewport
         context.setFillColor(NSColor.black.withAlphaComponent(0.5).cgColor)
-        
-        // Left dim
         context.fill(NSRect(x: 0, y: 0, width: screenRect.minX, height: bounds.height))
-        // Right dim
         context.fill(NSRect(x: screenRect.maxX, y: 0, width: bounds.width - screenRect.maxX, height: bounds.height))
-        // Top dim
         context.fill(NSRect(x: screenRect.minX, y: screenRect.maxY, width: screenRect.width, height: bounds.height - screenRect.maxY))
-        // Bottom dim
         context.fill(NSRect(x: screenRect.minX, y: 0, width: screenRect.width, height: screenRect.minY))
-        
-        // Screen border
+
+        // Viewport border
         context.setStrokeColor(NSColor.white.cgColor)
         context.setLineWidth(2)
         context.stroke(screenRect)
+
+        // Subtle ground line guide
+        let zoffset = CGFloat(document.groundLineY)
+        let localcoordH = CGFloat(document.resolution.height)
+        let groundFraction = zoffset / localcoordH
+        // In AppKit (Y-up): top of screenRect is maxY, so ground is maxY minus a fraction of the height
+        let groundY = screenRect.maxY - groundFraction * screenRect.height
+        context.setStrokeColor(groundLineColor.withAlphaComponent(0.4).cgColor)
+        context.setLineWidth(1)
+        context.setLineDash(phase: 0, lengths: [6, 4])
+        context.move(to: CGPoint(x: screenRect.minX, y: groundY))
+        context.addLine(to: CGPoint(x: screenRect.maxX, y: groundY))
+        context.strokePath()
+        context.setLineDash(phase: 0, lengths: [])
+
+        // Camera X indicator
+        let cameraLabel = String(format: "Camera X: %+.0f", previewCameraX)
+        drawLabel(cameraLabel, at: NSPoint(x: screenRect.minX + 6, y: screenRect.minY + 6), color: .white)
     }
     
     // MARK: - Coordinate Conversion
@@ -644,11 +690,7 @@ class CanvasView: NSView {
     
     func setPreviewMode(_ enabled: Bool) {
         isPreviewMode = enabled
-        needsDisplay = true
-    }
-    
-    func setPreviewOffset(_ offset: CGFloat) {
-        previewOffset = offset
+        if !enabled { previewCameraX = 0 }
         needsDisplay = true
     }
     

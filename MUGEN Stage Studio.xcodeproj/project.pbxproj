@@ -24,6 +24,11 @@
 		D9DA06AC7C08FBDAB4B3715D /* ThumbnailGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D71A06206B0C127F54F0A47 /* ThumbnailGenerator.swift */; };
 		EE9483F37AED3258EC117FD6 /* SFFWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95F21A80C6F63E350841592 /* SFFWriter.swift */; };
 		FA11AFC2C1D81969BD796624 /* ExportController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1359AA1AB062FE48364D5E /* ExportController.swift */; };
+		AA111111111111111111AA10 /* MUGENRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA111111111111111111AA09 /* MUGENRenderer.swift */; };
+		AA111111111111111111AA11 /* DEFGeneratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA111111111111111111AA02 /* DEFGeneratorTests.swift */; };
+		AA111111111111111111AA12 /* SFFWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA111111111111111111AA03 /* SFFWriterTests.swift */; };
+		AA111111111111111111AA13 /* MUGENCameraTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA111111111111111111AA04 /* MUGENCameraTests.swift */; };
+		AA111111111111111111AA14 /* ValidationEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA111111111111111111AA05 /* ValidationEngineTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -47,7 +52,32 @@
 		CB68ADBBDC12BB41C76ED41F /* CanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasView.swift; sourceTree = "<group>"; };
 		E3EBA893C786BB7FC35B30CF /* StageDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageDocument.swift; sourceTree = "<group>"; };
 		F6ECDFD60F3A5E381006F06D /* LayerSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerSidebarView.swift; sourceTree = "<group>"; };
+		AA111111111111111111AA01 /* MUGENStageStudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MUGENStageStudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA111111111111111111AA02 /* DEFGeneratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DEFGeneratorTests.swift; sourceTree = "<group>"; };
+		AA111111111111111111AA03 /* SFFWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SFFWriterTests.swift; sourceTree = "<group>"; };
+		AA111111111111111111AA04 /* MUGENCameraTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUGENCameraTests.swift; sourceTree = "<group>"; };
+		AA111111111111111111AA05 /* ValidationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationEngineTests.swift; sourceTree = "<group>"; };
+		AA111111111111111111AA06 /* stage0-720.def */ = {isa = PBXFileReference; lastKnownFileType = text; path = "stage0-720.def"; sourceTree = "<group>"; };
+		AA111111111111111111AA09 /* MUGENRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MUGENRenderer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		AA111111111111111111AA21 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F888F30BDCBF38F48ECFEE09 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 522754B4DE79880EF3B19B2D;
+			remoteInfo = "MUGEN Stage Studio";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		AA111111111111111111AA20 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 522754B4DE79880EF3B19B2D /* MUGEN Stage Studio */;
+			targetProxy = AA111111111111111111AA21 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXGroup section */
 		1668A7A76EC294FF25944B98 /* Controllers */ = {
@@ -85,6 +115,7 @@
 			isa = PBXGroup;
 			children = (
 				AA5F28D9B792D3C83CDE01F1 /* MUGEN Stage Studio */,
+				AA111111111111111111AA08 /* MUGENStageStudioTests */,
 				811EFAD73659F964D64AC4EF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -93,8 +124,29 @@
 			isa = PBXGroup;
 			children = (
 				68F87F68DBBC3F42834D1C0C /* MUGEN Stage Studio.app */,
+				AA111111111111111111AA01 /* MUGENStageStudioTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AA111111111111111111AA07 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				AA111111111111111111AA06 /* stage0-720.def */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		AA111111111111111111AA08 /* MUGENStageStudioTests */ = {
+			isa = PBXGroup;
+			children = (
+				AA111111111111111111AA02 /* DEFGeneratorTests.swift */,
+				AA111111111111111111AA03 /* SFFWriterTests.swift */,
+				AA111111111111111111AA04 /* MUGENCameraTests.swift */,
+				AA111111111111111111AA05 /* ValidationEngineTests.swift */,
+				AA111111111111111111AA07 /* Fixtures */,
+			);
+			path = MUGENStageStudioTests;
 			sourceTree = "<group>";
 		};
 		AA5F28D9B792D3C83CDE01F1 /* MUGEN Stage Studio */ = {
@@ -122,6 +174,7 @@
 			isa = PBXGroup;
 			children = (
 				6A50230B54D2CFDF8E1731AD /* DEFGenerator.swift */,
+				AA111111111111111111AA09 /* MUGENRenderer.swift */,
 				B95F21A80C6F63E350841592 /* SFFWriter.swift */,
 				E3EBA893C786BB7FC35B30CF /* StageDocument.swift */,
 				8D71A06206B0C127F54F0A47 /* ThumbnailGenerator.swift */,
@@ -160,6 +213,24 @@
 			productReference = 68F87F68DBBC3F42834D1C0C /* MUGEN Stage Studio.app */;
 			productType = "com.apple.product-type.application";
 		};
+		AA111111111111111111AA15 /* MUGENStageStudioTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA111111111111111111AA19 /* Build configuration list for PBXNativeTarget "MUGENStageStudioTests" */;
+			buildPhases = (
+				AA111111111111111111AA16 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA111111111111111111AA20 /* PBXTargetDependency */,
+			);
+			name = MUGENStageStudioTests;
+			packageProductDependencies = (
+			);
+			productName = MUGENStageStudioTests;
+			productReference = AA111111111111111111AA01 /* MUGENStageStudioTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -171,6 +242,10 @@
 				TargetAttributes = {
 					522754B4DE79880EF3B19B2D = {
 						ProvisioningStyle = Automatic;
+					};
+					AA111111111111111111AA15 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 522754B4DE79880EF3B19B2D;
 					};
 				};
 			};
@@ -189,6 +264,7 @@
 			projectRoot = "";
 			targets = (
 				522754B4DE79880EF3B19B2D /* MUGEN Stage Studio */,
+				AA111111111111111111AA15 /* MUGENStageStudioTests */,
 			);
 		};
 /* End PBXProject section */
@@ -198,6 +274,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA111111111111111111AA10 /* MUGENRenderer.swift in Sources */,
 				6295D75004CB101C71F76530 /* AppDelegate.swift in Sources */,
 				D367BD44193E4072F2C7B0F2 /* CGExtensions.swift in Sources */,
 				575C523E3CB6CBD2471EF665 /* CanvasView.swift in Sources */,
@@ -215,6 +292,17 @@
 				D9DA06AC7C08FBDAB4B3715D /* ThumbnailGenerator.swift in Sources */,
 				D882E6FBA132C2466F198F4C /* ValidationEngine.swift in Sources */,
 				CB7AF219FF2BA067998DA198 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA111111111111111111AA16 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA111111111111111111AA11 /* DEFGeneratorTests.swift in Sources */,
+				AA111111111111111111AA12 /* SFFWriterTests.swift in Sources */,
+				AA111111111111111111AA13 /* MUGENCameraTests.swift in Sources */,
+				AA111111111111111111AA14 /* ValidationEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -376,6 +464,32 @@
 			};
 			name = Release;
 		};
+		AA111111111111111111AA17 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mugen-stage-studio.tests";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MUGEN Stage Studio.app/Contents/MacOS/MUGEN Stage Studio";
+			};
+			name = Debug;
+		};
+		AA111111111111111111AA18 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.mugen-stage-studio.tests";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MUGEN Stage Studio.app/Contents/MacOS/MUGEN Stage Studio";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -393,6 +507,15 @@
 			buildConfigurations = (
 				EFDB38C7835BBADDECB1F073 /* Debug */,
 				F4D4018B5A51446431EDE6E1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AA111111111111111111AA19 /* Build configuration list for PBXNativeTarget "MUGENStageStudioTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA111111111111111111AA17 /* Debug */,
+				AA111111111111111111AA18 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

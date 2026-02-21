@@ -27,3 +27,19 @@ targets:
         CODE_SIGN_STYLE: Automatic
         COMBINE_HIDPI_IMAGES: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  MUGENStageStudioTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: MUGENStageStudioTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: MUGEN Stage Studio
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mugen-stage-studio.tests
+        CODE_SIGN_STYLE: Automatic
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MUGEN Stage Studio.app/Contents/MacOS/MUGEN Stage Studio"
+        BUNDLE_LOADER: "$(TEST_HOST)"
