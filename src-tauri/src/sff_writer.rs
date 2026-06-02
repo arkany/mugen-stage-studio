@@ -15,34 +15,73 @@ pub fn write_sff(
         .map_err(|e| format!("Failed to read background image: {e}"))?
         .to_rgba8();
     let transformed = transform_image(source, template, conformance)?;
-    let pcx = encode_pcx_8(&transformed)?;
+    let main_pcx = encode_pcx_8(&transformed)?;
+    let thumbnail = generate_thumbnail(&transformed);
+    let thumbnail_pcx = encode_pcx_8(&thumbnail)?;
 
     let mut bytes = vec![0u8; 512];
     bytes[0..12].copy_from_slice(b"ElecbyteSpr\0");
     bytes[12..16].copy_from_slice(&[0, 1, 0, 1]);
-    write_u32(&mut bytes, 16, 1);
-    write_u32(&mut bytes, 20, 1);
+    write_u32(&mut bytes, 16, 2);
+    write_u32(&mut bytes, 20, 2);
     write_u32(&mut bytes, 24, 512);
     write_u32(&mut bytes, 28, 32);
     bytes[32] = 0;
 
-    let mut subfile = vec![0u8; 32];
-    write_u32(&mut subfile, 0, 0);
-    write_u32(
-        &mut subfile,
-        4,
-        u32::try_from(pcx.len()).map_err(|_| "PCX payload is too large".to_string())?,
-    );
-    write_i16(&mut subfile, 8, checked_i16(template.axis_x, "axis_x")?);
-    write_i16(&mut subfile, 10, checked_i16(template.axis_y, "axis_y")?);
-    write_u16(&mut subfile, 12, 0);
-    write_u16(&mut subfile, 14, 0);
-    write_u16(&mut subfile, 16, 0);
-    subfile[18] = 0;
+    let second_header_offset = 512usize
+        .checked_add(32)
+        .and_then(|v| v.checked_add(main_pcx.len()))
+        .ok_or_else(|| "SFF payload is too large".to_string())?;
+    let main = SpriteSubfile {
+        next_offset: u32::try_from(second_header_offset)
+            .map_err(|_| "SFF payload is too large".to_string())?,
+        data: &main_pcx,
+        axis_x: checked_i16(template.axis_x, "axis_x")?,
+        axis_y: checked_i16(template.axis_y, "axis_y")?,
+        group: 0,
+        item: 0,
+    };
+    let thumb = SpriteSubfile {
+        next_offset: 0,
+        data: &thumbnail_pcx,
+        axis_x: 0,
+        axis_y: 0,
+        group: 9000,
+        item: 1,
+    };
 
-    bytes.extend_from_slice(&subfile);
-    bytes.extend_from_slice(&pcx);
+    append_subfile(&mut bytes, main)?;
+    append_subfile(&mut bytes, thumb)?;
     fs::write(output_path, bytes).map_err(|e| format!("Failed to write SFF: {e}"))
+}
+
+struct SpriteSubfile<'a> {
+    next_offset: u32,
+    data: &'a [u8],
+    axis_x: i16,
+    axis_y: i16,
+    group: u16,
+    item: u16,
+}
+
+fn append_subfile(bytes: &mut Vec<u8>, subfile: SpriteSubfile<'_>) -> Result<(), String> {
+    let mut header = vec![0u8; 32];
+    write_u32(&mut header, 0, subfile.next_offset);
+    write_u32(
+        &mut header,
+        4,
+        u32::try_from(subfile.data.len()).map_err(|_| "PCX payload is too large".to_string())?,
+    );
+    write_i16(&mut header, 8, subfile.axis_x);
+    write_i16(&mut header, 10, subfile.axis_y);
+    write_u16(&mut header, 12, subfile.group);
+    write_u16(&mut header, 14, subfile.item);
+    write_u16(&mut header, 16, 0);
+    header[18] = 0;
+
+    bytes.extend_from_slice(&header);
+    bytes.extend_from_slice(subfile.data);
+    Ok(())
 }
 
 fn transform_image(
@@ -121,6 +160,28 @@ fn encode_pcx_8(image: &RgbaImage) -> Result<Vec<u8>, String> {
     bytes.push(12);
     bytes.extend_from_slice(&ega_332_palette());
     Ok(bytes)
+}
+
+fn generate_thumbnail(image: &RgbaImage) -> RgbaImage {
+    let crop = thumbnail_crop(image);
+    imageops::resize(&crop, 240, 100, imageops::FilterType::Triangle)
+}
+
+fn thumbnail_crop(image: &RgbaImage) -> RgbaImage {
+    const TARGET_RATIO: f32 = 2.4;
+    let width = image.width();
+    let height = image.height();
+    let ratio = width as f32 / height as f32;
+
+    if ratio > TARGET_RATIO {
+        let crop_width = (height as f32 * TARGET_RATIO).round() as u32;
+        let crop_x = (width - crop_width) / 2;
+        imageops::crop_imm(image, crop_x, 0, crop_width, height).to_image()
+    } else {
+        let crop_height = (width as f32 / TARGET_RATIO).round() as u32;
+        let biased_y = height.saturating_sub(crop_height + height / 10);
+        imageops::crop_imm(image, 0, biased_y, width, crop_height).to_image()
+    }
 }
 
 fn rgb_to_palette_index(rgba: [u8; 4]) -> u8 {
@@ -255,11 +316,11 @@ mod tests {
         let bytes = fs::read(output_path).expect("read sff");
         assert_eq!(&bytes[0..12], b"ElecbyteSpr\0");
         assert_eq!(&bytes[12..16], &[0, 1, 0, 1]);
-        assert_eq!(read_u32(&bytes, 16), 1);
-        assert_eq!(read_u32(&bytes, 20), 1);
+        assert_eq!(read_u32(&bytes, 16), 2);
+        assert_eq!(read_u32(&bytes, 20), 2);
         assert_eq!(read_u32(&bytes, 24), 512);
         assert_eq!(read_u32(&bytes, 28), 32);
-        assert_eq!(read_u32(&bytes, 512), 0);
+        assert!(read_u32(&bytes, 512) > 0);
         assert!(read_u32(&bytes, 516) > 128);
         assert_eq!(read_u16(&bytes, 520), template.axis_x as u16);
         assert_eq!(read_u16(&bytes, 522), template.axis_y as u16);
@@ -293,5 +354,36 @@ mod tests {
         assert_eq!(read_u16(&bytes, pcx_offset + 10), template.bg_height as u16 - 1);
         assert_eq!(bytes[pcx_offset + 65], 1);
         assert_eq!(bytes[bytes.len() - 769], 12);
+    }
+
+    #[test]
+    fn writes_stage_select_thumbnail_as_second_sprite() {
+        let template = tiny_template();
+        let (_image_dir, image_path) = write_png(template.bg_width, template.bg_height);
+        let output_dir = tempdir().expect("output dir");
+        let output_path = output_dir.path().join("stage.sff");
+
+        write_sff(
+            &output_path,
+            &image_path,
+            &template,
+            &ConformanceState::Correct,
+        )
+        .expect("write sff");
+
+        let bytes = fs::read(output_path).expect("read sff");
+        let second_header = read_u32(&bytes, 512) as usize;
+        assert_eq!(read_u32(&bytes, second_header), 0);
+        assert!(read_u32(&bytes, second_header + 4) > 128);
+        assert_eq!(read_u16(&bytes, second_header + 8), 0);
+        assert_eq!(read_u16(&bytes, second_header + 10), 0);
+        assert_eq!(read_u16(&bytes, second_header + 12), 9000);
+        assert_eq!(read_u16(&bytes, second_header + 14), 1);
+
+        let pcx_offset = second_header + 32;
+        assert_eq!(bytes[pcx_offset], 0x0A);
+        assert_eq!(read_u16(&bytes, pcx_offset + 8), 239);
+        assert_eq!(read_u16(&bytes, pcx_offset + 10), 99);
+        assert_eq!(bytes[pcx_offset + 65], 1);
     }
 }
