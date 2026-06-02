@@ -116,13 +116,8 @@ pub const T2: StageTemplate = StageTemplate {
 // stage in the dataset. Source uses top-anchored axis (900, 0); template
 // rewrites to center-bottom (900, 1050) per Stage Studio convention.
 // boundhigh is formula-derived (-330); source used -326 (within rounding).
-//
-// NOTE: The Phase 4a spec lists T3_STANDARD and T3_WIDE as separate entries
-// in ALL_TEMPLATES, but `mugen-stage-skill.md` documents only a single T3.
-// T3_STANDARD = CF3GRAVE (skill file's T3). T3_WIDE is a second 1280×720
-// variant added below for users who want wider horizontal scroll; it sources
-// from Elecbyte's `stage0-720` which the skill file documents as a soft-tier
-// cross-check at this resolution. See report for the discrepancy.
+// See `mugen-stage-skill.md` Section 2 "Template T3_STANDARD" for the full
+// derivation and the cross-check against T3_WIDE's `stage0-720` source.
 pub const T3_STANDARD: StageTemplate = StageTemplate {
     id: "T3_STANDARD",
     display_name: "1280×720 IKEMEN GO Standard",
@@ -148,18 +143,20 @@ pub const T3_STANDARD: StageTemplate = StageTemplate {
 };
 
 // T3_WIDE — 1280×720 IKEMEN GO Wide
-// Source: `stage0-720` by Elecbyte. Soft-tier in the skill file
-// (parallax-only main BG, source bounds tighter than formula); used here
-// as a wider variant of the 1280×720 template for users who want larger
-// horizontal scroll than CF3GRAVE's 1800×1050 affords.
+// Source: `stage0-720` by Elecbyte. The wider variant of the 1280×720
+// template for stages where the backdrop is designed to scroll
+// significantly (cinematic stages, large arenas) — backdrop ~2.5× viewport
+// width vs T3_STANDARD's ~1.4×.
 //
-// Bounds are formula-derived from the wide 3200×1072 image. zoffset and
-// camera params come from stage0-720 directly. floortension diverges
-// from T3_STANDARD (200 vs 400) — skill file Section 2 T3 cross-check note
-// covers the discrepancy between CF3GRAVE and stage0-720.
+// Bounds are formula-derived from the 3200×1072 image. zoffset and camera
+// params come from stage0-720 directly. floortension diverges from
+// T3_STANDARD (200 vs 400); both values are documented in the skill file.
 //
-// CONFIDENCE: Empirical-source values, but the source is soft-tier
-// (parallax-only) — see skill Section 5 caveat about parallax-only stages.
+// CONFIDENCE: Empirical — Elecbyte first-party source. Note the source is
+// parallax-only (every BG layer has `delta < 1`); see `mugen-stage-skill.md`
+// Section 2 "Template T3_WIDE" parallax flag and Section 5 for what
+// parallax-only implies for the formula. The template's boundhigh is
+// formula-derived rather than copied from the source's `-450`.
 pub const T3_WIDE: StageTemplate = StageTemplate {
     id: "T3_WIDE",
     display_name: "1280×720 IKEMEN GO Wide",

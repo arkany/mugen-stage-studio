@@ -79,7 +79,14 @@ def classify(r: dict[str, Any]) -> dict[str, Any]:
     if not sff_ok:
         failure_reasons.append(f"sff_unreadable({r.get('sff_error')})")
     if not has_def:
-        failure_reasons.append("def_unreadable")
+        # Prefer the specific parser error message when present — it tells the
+        # reader what actually failed (encoding issue, missing section, etc.)
+        # rather than the bare "def_unreadable" label.
+        def_err = r.get("def_error")
+        if def_err:
+            failure_reasons.append(f"def_parse_failed({def_err})")
+        else:
+            failure_reasons.append("def_unreadable")
     if parallax_only:
         # Informational, not disqualifying. The (W-lc)/2 formula is conservative
         # for delta < 1, so a parallax-only stage can still pass within-formula

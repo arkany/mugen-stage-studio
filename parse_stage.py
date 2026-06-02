@@ -480,6 +480,29 @@ def analyze_pair(sff_path: Path, def_path: Path, label: str | None = None) -> di
         result["def"] = None
         result["def_error"] = f"{type(e).__name__}: {e}"
 
+    # If DEF parsing failed outright, do not attempt the SFF lookup. Without a
+    # DEF we cannot know which sprite is the main BG, and proceeding would
+    # silently fall back to sprite (0,0) and emit a half-cooked record that
+    # the classifier would have to special-case. Short-circuit cleanly: leave
+    # the sprite slot empty and surface the DEF error in `derived` too so the
+    # downstream report doesn't drop the stage on the floor.
+    if result.get("def") is None:
+        result["sff_version"] = None
+        result["sprite"] = None
+        result["sff_error"] = "skipped: DEF parse failed (see def_error)"
+        result["bg_candidates"] = []
+        result["parallax_only"] = False
+        result["derived"] = {
+            "localcoordSource": None,
+            "localcoordWidth": None,
+            "localcoordHeight": None,
+            "expectedBoundleft": None,
+            "expectedBoundright": None,
+            "expectedBoundhigh": None,
+            "boundsMatchDerived": False,
+        }
+        return result
+
     # SFF lookup. The bounds formula `±(imgW - lcW)/2` only applies to layers
     # that scroll 1:1 with the camera (`delta = 1, 1`, the default). Stages with
     # no 1:1 layer are pure-parallax and bounds are author-chosen.
