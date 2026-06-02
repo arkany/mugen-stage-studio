@@ -9,11 +9,8 @@ export function getTemplates(): Promise<StageTemplate[]> {
   return invoke<StageTemplate[]>("get_templates");
 }
 
-export function loadImage(
-  imagePath: string,
-  templateId: string,
-): Promise<StageConfig> {
-  return invoke<StageConfig>("load_image", { imagePath, templateId });
+export function loadImage(templateId: string): Promise<StageConfig> {
+  return invoke<StageConfig>("load_image", { templateId });
 }
 
 export function exportStage(config: StageConfig): Promise<string> {

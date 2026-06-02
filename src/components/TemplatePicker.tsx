@@ -31,7 +31,7 @@ export function TemplatePicker({
       <h1 className="text-xl font-semibold mb-4">Pick a template</h1>
 
       {loadError && (
-        <p className="text-red-600 mb-4">Failed to load templates: {loadError}</p>
+        <p className="text-red-600 mb-4 dark:text-red-400">Failed to load templates: {loadError}</p>
       )}
 
       <ul className="space-y-2">
@@ -45,17 +45,17 @@ export function TemplatePicker({
                 className={
                   "w-full text-left p-3 border rounded " +
                   (selected
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-300 hover:border-gray-500")
+                    ? "border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/50"
+                    : "border-gray-300 hover:border-gray-500 dark:border-gray-700 dark:hover:border-gray-500")
                 }
               >
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="font-medium">{t.displayName}</div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-gray-600 dark:text-gray-300">
                       localcoord {t.localcoordW}×{t.localcoordH} · image {t.bgWidth}×{t.bgHeight}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-500 mt-1 dark:text-gray-400">
                       Source: {t.sourceStage}
                       {t.sourceAuthor && t.sourceAuthor !== "(none — no source at this resolution)"
                         ? ` (${t.sourceAuthor})`
@@ -66,8 +66,8 @@ export function TemplatePicker({
                     className={
                       "text-xs px-2 py-1 rounded " +
                       (t.confidence === "Empirical"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-amber-100 text-amber-800")
+                        ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300"
+                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300")
                     }
                   >
                     {t.confidence === "Empirical" ? "Empirical" : "Formula-derived"}
@@ -84,7 +84,7 @@ export function TemplatePicker({
           type="button"
           onClick={onContinue}
           disabled={selectedTemplateId === null}
-          className="px-4 py-2 bg-blue-600 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed dark:bg-blue-500 dark:hover:bg-blue-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
         >
           Use Template
         </button>

@@ -1,4 +1,6 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Project-specific styles can go here. Tailwind v4 reads CSS variables from
    the @import above; no further config file is required. */

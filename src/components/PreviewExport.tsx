@@ -18,10 +18,8 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
     setExportError(null);
     try {
       const result = await exportStage(config);
-      setExportMessage(result);
+      setExportMessage(`Stage exported! ZIP package and loose DEF/SFF files saved to ${result}`);
     } catch (e) {
-      // Phase 4a stub returns Err("Export not yet implemented — Phase 4b").
-      // Surfacing the error string is the correct UX for this phase.
       setExportError(String(e));
     }
   };
@@ -29,7 +27,7 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
   return (
     <section className="p-6">
       <h1 className="text-xl font-semibold mb-2">Preview &amp; export</h1>
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-600 mb-4 dark:text-gray-300">
         Template: <span className="font-medium">{template.displayName}</span>
       </p>
 
@@ -40,7 +38,7 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
             type="text"
             value={config.name}
             onChange={(e) => setConfig({ ...config, name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
+            className="w-full px-3 py-2 border border-gray-300 rounded bg-white text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
             placeholder="My new stage"
           />
         </label>
@@ -51,7 +49,7 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
             type="text"
             value={config.author}
             onChange={(e) => setConfig({ ...config, author: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
+            className="w-full px-3 py-2 border border-gray-300 rounded bg-white text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
             placeholder="Your name"
           />
         </label>
@@ -61,26 +59,26 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
         <button
           type="button"
           onClick={onBack}
-          className="px-4 py-2 border border-gray-400 rounded"
+          className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-900"
         >
           Back
         </button>
         <button
           type="button"
           onClick={onExport}
-          className="px-4 py-2 bg-blue-600 text-white rounded"
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400"
         >
           Export
         </button>
       </div>
 
       {exportMessage && (
-        <p className="text-green-700 bg-green-50 border border-green-200 rounded p-3">
+        <p className="text-green-700 bg-green-50 border border-green-200 rounded p-3 dark:border-green-900 dark:bg-green-950/50 dark:text-green-300">
           {exportMessage}
         </p>
       )}
       {exportError && (
-        <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
+        <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded p-3 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
           {exportError}
         </p>
       )}
