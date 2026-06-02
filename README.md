@@ -1,139 +1,80 @@
 # MUGEN Stage Studio
 
-A native macOS application for creating and exporting custom stages for **M.U.G.E.N**, **IKEMEN GO**, and other compatible fighting game engines.
+Cross-platform desktop app for creating MUGEN / IKEMEN GO stages with
+mathematically correct parameters. Replaces the broken Swift/macOS app
+with a Tauri 2 + Rust + React 19 stack so Windows, macOS, and Linux all
+ship from one codebase.
 
-![macOS](https://img.shields.io/badge/macOS-13.0+-blue)
-![Swift](https://img.shields.io/badge/Swift-5.9-orange)
-![License](https://img.shields.io/badge/License-MIT-green)
+> **Phase 4a scaffold** — this is the architectural skeleton. SFF binary
+> generation, DEF serialization, image conformance, and the preview canvas
+> are stubs until Phase 4b. See [`rebuild-plan.md`](./rebuild-plan.md) for
+> the full phase plan.
 
-**Keywords:** MUGEN, M.U.G.E.N, IKEMEN GO, Ikemen, stage creator, stage maker, SFF editor, DEF generator, hi-res stages, 720p, custom stages, fighting game, screenpack compatible
+## Architecture
 
-## Overview
+- **Rust backend** ([`src-tauri/`](./src-tauri/)) — owns format logic, file
+  I/O, and the typed `StageTemplate` constants. Templates are compile-time
+  constants, not user-configurable values.
+- **React frontend** ([`src/`](./src/)) — three step-based screens
+  (`TemplatePicker` → `ImageImport` → `PreviewExport`) talking to Rust via
+  typed `invoke` wrappers in [`src/hooks/useTauriCommands.ts`](./src/hooks/useTauriCommands.ts).
+- **Tailwind v4** for styling via the Vite plugin.
 
-MUGEN Stage Studio simplifies the process of creating custom fighting game stages by providing a visual editor and handling the complex SFF/DEF file format generation automatically. No more manual hex editing or command-line tools — just import your background images, arrange layers, and export ready-to-use stage packages compatible with MUGEN 1.0, MUGEN 1.1, and IKEMEN GO.
+## Documentation
 
-Perfect for creators making custom content, full games, or expanding their roster's stage selection.
+Read in this order:
 
-## Features
+1. [`rebuild-plan.md`](./rebuild-plan.md) — why we're rebuilding, the
+   stack choice, and the phase breakdown.
+2. [`mugen-stage-skill.md`](./mugen-stage-skill.md) — the full reasoning
+   kit: parameter model, all five canonical templates with derivations,
+   axis conventions, parallax/`delta` semantics, image conformance windows,
+   and validator quick-reference. **Read this before changing any
+   template values.**
+3. [`template-candidates.md`](./template-candidates.md) — Phase 2 curated
+   report of the 50 reference stages and which became canonical sources.
+4. [`stage-analysis.json`](./stage-analysis.json) — Phase 2 raw parsed data.
+5. [`VALIDATOR-CONCEPT.md`](./VALIDATOR-CONCEPT.md) — sibling Phase 5
+   web tool that shares the Rust core library.
 
-- **Visual Stage Editor** - Drag and drop background images onto a canvas
-- **Layer Management** - Support for multiple background layers with z-ordering (BG elements)
-- **Live Preview** - See your stage with proper localcoord scaling as it will appear in-game
-- **One-Click Export** - Generates complete stage packages (SFF + DEF files) ready for your stages folder
-- **IKEMEN GO & MUGEN 1.1 Compatible** - Exports in SFF v2.01 format with PNG compression (no palette limitations!)
-- **Automatic Thumbnails** - Generates 240×100 stage select screen thumbnails (sprite 9000,1)
-- **Hi-Res Support** - Native 1280×720 (720p) output for modern screenpacks
+## Build & test
 
-## Requirements
+From this directory:
 
-- macOS 13.0 (Ventura) or later
-- Xcode 15+ (for building from source)
+```bash
+# Backend builds clean
+(cd src-tauri && cargo build)
 
-## Installation
+# Frontend type-check
+npx tsc --noEmit
 
-### Building from Source
+# Full production build
+npm run build
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/mugen-stage-studio.git
-   cd mugen-stage-studio
-   ```
+# Launch the desktop app (opens a WebKit window)
+npm run tauri dev
+```
 
-2. Open the project in Xcode:
-   ```bash
-   open "MUGEN Stage Studio.xcodeproj"
-   ```
+The first `tauri dev` run takes 1–3 minutes to compile the debug bundle.
+Subsequent runs are fast (Vite HMR + Rust incremental compile).
 
-3. Build and run (⌘R)
+## What's in this scaffold
 
-## Usage
+| Path | Contents |
+|---|---|
+| [`src-tauri/src/templates.rs`](./src-tauri/src/templates.rs) | 5 `StageTemplate` constants (T1, T2, T3_STANDARD, T3_WIDE, T4) populated from `mugen-stage-skill.md` Section 2 |
+| [`src-tauri/src/commands.rs`](./src-tauri/src/commands.rs) | 3 Tauri commands: `get_templates`, `load_image`, `export_stage` (last two are typed stubs for Phase 4b) |
+| [`src-tauri/src/stage_config.rs`](./src-tauri/src/stage_config.rs) | `StageConfig` + `ConformanceState` shared structs |
+| [`src-tauri/src/image_check.rs`](./src-tauri/src/image_check.rs) | Conformance API surface — stub returning `NoImage` until Phase 4b |
+| [`src/types/stage.ts`](./src/types/stage.ts) | TypeScript mirror of the Rust structs |
+| [`src/components/`](./src/components/) | Three React step screens |
 
-### Creating a Stage
+## What's deliberately absent (Phase 4b scope)
 
-1. **Launch the app** and create a new document (⌘N)
-2. **Import a background image** - Drag an image onto the canvas or use File → Import (supports PNG, JPG, BMP)
-3. **Adjust positioning** - Use the inspector panel to fine-tune layer properties and delta values
-4. **Export** - File → Export Stage (⌘E) to generate a ready-to-use stage package
-
-### Export Format
-
-The exported ZIP contains a complete stage folder:
-- `stagename.sff` - Sprite file containing BG elements and stage select thumbnail
-- `stagename.def` - Stage definition file with camera settings, bounds, zoffset, player start positions, shadow settings, and BGdef
-
-### Installing in IKEMEN GO / MUGEN
-
-1. Extract the exported ZIP
-2. Copy the stage folder to your `stages/` directory
-3. Add the stage to your `select.def` file under ExtraStages:
-   ```ini
-   [ExtraStages]
-   stages/yourstagename/yourstagename.def
-   ```
-4. The stage will appear in your stage select screen with its thumbnail!
-
-For MUGEN 1.0/1.1, follow the same process with your MUGEN installation's stages folder.
-
-## Technical Details
-
-### Current Limitations
-
-- **Fixed Resolution**: Exports at 1280×720 localcoord (training room style, non-scrolling)
-- **Single BG Layer**: Currently exports only the primary background element (spriteno = 0,0)
-- **No Animation**: Static backgrounds only (no animated BG elements or [Begin Action] support yet)
-- **No Parallax**: Single-layer stages without delta-based scrolling
-
-### File Formats
-
-- **SFF v2.01**: ElecbyteSpr format with PNG-compressed sprites (no 256-color palette restrictions)
-- **DEF**: INI-style stage definition files compatible with MUGEN 1.0, 1.1, and IKEMEN GO
-
-### Stage Parameters (Default Values)
-
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| localcoord | 1280×720 | Stage coordinate space (hi-res) |
-| zoffset | 660 | Ground level (floor line) |
-| boundleft/right | -500 / +500 | Camera horizontal bounds |
-| boundhigh/low | -25 / 0 | Camera vertical bounds |
-| p1startx/p2startx | -200 / +200 | Player starting positions |
-| autoturn | 1 | Players face each other |
-| floortension | 160 | Camera vertical follow threshold |
-
-## Roadmap
-
-- [ ] Support for scrolling/panning stages (wider backgrounds with proper boundleft/boundright)
-- [ ] Multiple BG layers with parallax (delta values for depth effect)
-- [ ] Foreground layer support (layerno = 1)
-- [ ] Animated BG elements ([Begin Action] support)
-- [ ] Custom stage parameters editor (bounds, player positions, zoffset)
-- [ ] Floor/reflection layer support
-- [ ] BGM music configuration
-- [ ] Lo-res 320×240 export option for WinMUGEN compatibility
-- [ ] Import existing SFF/DEF for editing
-
-## Contributing
-
-Contributions are welcome! Whether you're a MUGEN veteran or new to the community, feel free to submit issues, pull requests, or suggestions.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- [Elecbyte](http://www.elecbyte.com/) - Creators of M.U.G.E.N, the legendary fighting game engine
-- [IKEMEN GO](https://github.com/ikemen-engine/Ikemen-GO) - The open source successor keeping the community alive
-- The amazing MUGEN community - Decades of creators, chars, stages, screenpacks, and full games
-- [The Mugen Fighters Guild](https://mugenfreeforall.com/) - Community resources and documentation
-- [Mugen Free For All](https://mugenfreeforall.com/) - Hosting and sharing custom content
-
-## Related Resources
-
-- [IKEMEN GO Wiki](https://github.com/ikemen-engine/Ikemen-GO/wiki) - Official documentation
-- [Elecbyte MUGEN Docs](http://www.elecbyte.com/mugendocs/) - Original format specifications
-- [SFF v2 Format Spec](http://www.dvdvilla.com/mugen/) - Technical SFF documentation
-
----
-
-*Not affiliated with Elecbyte. M.U.G.E.N is a trademark of Elecbyte.*
+- SFF v2.01 binary generation
+- DEF file serialization
+- Real image dimension reading, crop, extend
+- 240×100 thumbnail generation (sprite group 9000, sprite 1)
+- Visual preview canvas (localcoord viewport overlaid on background)
+- Multi-BG-element editing
+- Dialog-plugin file picker (currently uses `<input type="file">`)
