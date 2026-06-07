@@ -1,0 +1,64 @@
+; Reusable T1 fixture output for serializer and export tests.
+; Matches the canonical 320x240 Classic template.
+
+[Info]
+name = "T1 Fixture"
+displayname = "T1 Fixture"
+mugenversion = 1.0
+author = "MUGEN Stage Studio"
+
+[Camera]
+startx = 0
+starty = 0
+boundleft = -152
+boundright = 152
+boundhigh = -243
+boundlow = 0
+tension = 60
+verticalfollow = 0.2
+floortension = 90
+
+[PlayerInfo]
+p1startx = -70
+p1starty = 0
+p1facing = 1
+p2startx = 70
+p2starty = 0
+p2facing = -1
+leftbound = -1000
+rightbound = 1000
+
+[Bound]
+screenleft = 25
+screenright = 25
+
+[StageInfo]
+zoffset = 217
+autoturn = 1
+resetBG = 1
+localcoord = 320, 240
+
+[Shadow]
+intensity = 128
+color = 0, 0, 0
+yscale = 0.4
+
+[Reflection]
+reflect = 0
+
+[BGDef]
+spr = t1_fixture.sff
+debugbg = 0
+
+[BG 0]
+type = normal
+spriteno = 0, 0
+start = 0, 0
+delta = 1, 1
+tile = 0, 0
+layerno = 0
+mask = 0
+
+; Stage select thumbnail
+[Begin Action 9000]
+9000,1, 0,0, -1
