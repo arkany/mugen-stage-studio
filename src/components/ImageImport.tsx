@@ -6,8 +6,6 @@ interface Props {
   template: StageTemplate;
   config: StageConfig | null;
   setConfig: (c: StageConfig) => void;
-  onBack: () => void;
-  onContinue: () => void;
 }
 
 function describeConformance(state: ConformanceState): string {
@@ -25,7 +23,7 @@ function describeConformance(state: ConformanceState): string {
   }
 }
 
-export function ImageImport({ template, config, setConfig, onBack, onContinue }: Props) {
+export function ImageImport({ template, config, setConfig }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,49 +43,68 @@ export function ImageImport({ template, config, setConfig, onBack, onContinue }:
   };
 
   const state = config?.conformanceState ?? { type: "NoImage" as const };
-  const canContinue = state.type === "Correct";
+  const imageLabel = config?.bgImagePath ?? "No file selected";
 
   return (
-    <section className="p-6">
-      <h1 className="text-xl font-semibold mb-2">Import background</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Template: <span className="font-medium">{template.displayName}</span> · target {template.bgWidth}×{template.bgHeight}
-      </p>
-
-      <label className="block mb-4">
-        <span className="block text-sm font-medium mb-1">Background image</span>
-        <input type="file" accept="image/*" onChange={onFileChange} />
-      </label>
-
-      <div className="mb-4 p-3 border border-gray-200 rounded bg-gray-50">
-        <div className="text-sm font-medium">Conformance state</div>
-        <div className="text-sm text-gray-700">{describeConformance(state)}</div>
-        {state.type === "NoImage" && config?.bgImagePath && (
-          <div className="text-xs text-gray-500 mt-1">
-            (Phase 4a stub — real conformance arrives in Phase 4b)
-          </div>
-        )}
+    <section className="rounded border border-[#d9d1c3] bg-white p-4 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Image and conformance</h2>
+          <p className="text-xs text-[#6c655b]">
+            {template.displayName} · target {template.bgWidth}×{template.bgHeight}
+          </p>
+        </div>
+        <div className="rounded bg-[#f5f2eb] px-2 py-1 text-xs text-[#4f4940]">
+          axis {template.axisX},{template.axisY}
+        </div>
       </div>
 
-      {error && <p className="text-red-600 mb-4">{error}</p>}
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
+        <label className="flex min-h-40 cursor-pointer flex-col justify-center rounded border border-dashed border-[#b7a98f] bg-[#fffdf8] p-4">
+          <span className="text-sm font-semibold">Background image</span>
+          <span className="mt-1 text-xs text-[#6c655b]">{imageLabel}</span>
+          <input
+            className="mt-4 text-sm"
+            type="file"
+            accept="image/*"
+            onChange={onFileChange}
+          />
+        </label>
 
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-4 py-2 border border-gray-400 rounded"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={!canContinue}
-          className="px-4 py-2 bg-blue-600 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
-        >
-          Continue
-        </button>
+        <div className="rounded border border-[#d9d1c3] bg-[#f8f6f0] p-3">
+          <div className="text-sm font-semibold">Conformance state</div>
+          <div className="mt-2 text-sm text-[#4f4940]">{describeConformance(state)}</div>
+          {state.type === "NoImage" && config?.bgImagePath && (
+            <div className="mt-2 text-xs text-[#7c5b2c]">
+              Phase 4a stub: real dimension checks arrive in Phase 4b.
+            </div>
+          )}
+          <dl className="mt-4 grid grid-cols-2 gap-2 text-xs text-[#6c655b]">
+            <div>
+              <dt className="font-semibold text-[#4f4940]">Bounds</dt>
+              <dd>{template.boundLeft} / {template.boundRight}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-[#4f4940]">zoffset</dt>
+              <dd>{template.zoffset}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-[#4f4940]">boundhigh</dt>
+              <dd>{template.boundHigh}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-[#4f4940]">tension</dt>
+              <dd>{template.tension}</dd>
+            </div>
+          </dl>
+        </div>
       </div>
+
+      {error && (
+        <p className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

@@ -6,10 +6,9 @@ interface Props {
   template: StageTemplate;
   config: StageConfig;
   setConfig: (c: StageConfig) => void;
-  onBack: () => void;
 }
 
-export function PreviewExport({ template, config, setConfig, onBack }: Props) {
+export function PreviewExport({ template, config, setConfig }: Props) {
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
@@ -27,60 +26,62 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
   };
 
   return (
-    <section className="p-6">
-      <h1 className="text-xl font-semibold mb-2">Preview &amp; export</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Template: <span className="font-medium">{template.displayName}</span>
-      </p>
+    <section className="rounded border border-[#d9d1c3] bg-white p-4 shadow-sm">
+      <div className="mb-4">
+        <h2 className="text-base font-semibold">Export</h2>
+        <p className="text-xs text-[#6c655b]">
+          {template.id} · {template.localcoordW}×{template.localcoordH}
+        </p>
+      </div>
 
-      <div className="space-y-3 mb-6 max-w-md">
+      <div className="mb-4 space-y-3">
         <label className="block">
-          <span className="block text-sm font-medium mb-1">Stage name</span>
+          <span className="mb-1 block text-sm font-medium">Stage name</span>
           <input
             type="text"
             value={config.name}
             onChange={(e) => setConfig({ ...config, name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
+            className="w-full rounded border border-[#cfc4b1] px-3 py-2 text-sm outline-none focus:border-[#1f5f5b] focus:ring-2 focus:ring-[#b9d8ce]"
             placeholder="My new stage"
           />
         </label>
 
         <label className="block">
-          <span className="block text-sm font-medium mb-1">Author</span>
+          <span className="mb-1 block text-sm font-medium">Author</span>
           <input
             type="text"
             value={config.author}
             onChange={(e) => setConfig({ ...config, author: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
+            className="w-full rounded border border-[#cfc4b1] px-3 py-2 text-sm outline-none focus:border-[#1f5f5b] focus:ring-2 focus:ring-[#b9d8ce]"
             placeholder="Your name"
           />
         </label>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-4 py-2 border border-gray-400 rounded"
-        >
-          Back
-        </button>
+      <div className="mb-4 rounded bg-[#f8f6f0] p-3 text-xs text-[#6c655b]">
+        <div className="font-semibold text-[#4f4940]">Output contract</div>
+        <div className="mt-1">
+          DEF/SFF generation remains behind the existing Tauri export command.
+        </div>
+      </div>
+
+      <div className="mb-4">
         <button
           type="button"
           onClick={onExport}
-          className="px-4 py-2 bg-blue-600 text-white rounded"
+          className="w-full rounded bg-[#1f5f5b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#174844]"
         >
           Export
         </button>
       </div>
 
       {exportMessage && (
-        <p className="text-green-700 bg-green-50 border border-green-200 rounded p-3">
+        <p className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">
           {exportMessage}
         </p>
       )}
       {exportError && (
-        <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
+        <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
           {exportError}
         </p>
       )}

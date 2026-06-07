@@ -7,7 +7,6 @@ interface Props {
   setTemplates: (t: StageTemplate[]) => void;
   selectedTemplateId: string | null;
   setSelectedTemplateId: (id: string | null) => void;
-  onContinue: () => void;
 }
 
 export function TemplatePicker({
@@ -15,7 +14,6 @@ export function TemplatePicker({
   setTemplates,
   selectedTemplateId,
   setSelectedTemplateId,
-  onContinue,
 }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -27,68 +25,73 @@ export function TemplatePicker({
   }, [templates.length, setTemplates]);
 
   return (
-    <section className="p-6">
-      <h1 className="text-xl font-semibold mb-4">Pick a template</h1>
+    <section className="rounded border border-[#d9d1c3] bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Template</h2>
+          <p className="text-xs text-[#6c655b]">Choose the target coordinate model.</p>
+        </div>
+        <span className="text-xs text-[#6c655b]">{templates.length} presets</span>
+      </div>
 
       {loadError && (
-        <p className="text-red-600 mb-4">Failed to load templates: {loadError}</p>
+        <p className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+          Failed to load templates: {loadError}
+        </p>
       )}
 
-      <ul className="space-y-2">
+      <ul className="flex gap-3 overflow-x-auto pb-1">
         {templates.map((t) => {
           const selected = t.id === selectedTemplateId;
           return (
-            <li key={t.id}>
+            <li key={t.id} className="min-w-[200px] flex-1">
               <button
                 type="button"
                 onClick={() => setSelectedTemplateId(t.id)}
                 className={
-                  "w-full text-left p-3 border rounded " +
+                  "h-full w-full rounded border p-3 text-left transition " +
                   (selected
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-300 hover:border-gray-500")
+                    ? "border-[#1f5f5b] bg-[#ecf6f1] shadow-sm"
+                    : "border-[#d9d1c3] bg-[#fffdf8] hover:border-[#8f744d]")
                 }
+                aria-pressed={selected}
               >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-medium">{t.displayName}</div>
-                    <div className="text-sm text-gray-600">
+                <div className="flex h-full flex-col gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-semibold leading-snug">{t.id}</div>
+                      <div className="mt-1 text-xs leading-snug text-[#4f4940]">
+                        {t.displayName}
+                      </div>
+                    </div>
+                    <span
+                      className={
+                        "whitespace-nowrap rounded px-2 py-1 text-[11px] " +
+                        (t.confidence === "Empirical"
+                          ? "bg-[#dff0dc] text-[#235323]"
+                          : "bg-[#fff1c7] text-[#745000]")
+                      }
+                    >
+                      {t.confidence === "Empirical" ? "Empirical" : "Formula"}
+                    </span>
+                  </div>
+                  <div className="mt-auto space-y-1 text-xs text-[#6c655b]">
+                    <div>
                       localcoord {t.localcoordW}×{t.localcoordH} · image {t.bgWidth}×{t.bgHeight}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div>
                       Source: {t.sourceStage}
                       {t.sourceAuthor && t.sourceAuthor !== "(none — no source at this resolution)"
                         ? ` (${t.sourceAuthor})`
                         : ""}
                     </div>
                   </div>
-                  <span
-                    className={
-                      "text-xs px-2 py-1 rounded " +
-                      (t.confidence === "Empirical"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-amber-100 text-amber-800")
-                    }
-                  >
-                    {t.confidence === "Empirical" ? "Empirical" : "Formula-derived"}
-                  </span>
                 </div>
               </button>
             </li>
           );
         })}
       </ul>
-
-      <div className="mt-6">
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={selectedTemplateId === null}
-          className="px-4 py-2 bg-blue-600 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
-        >
-          Use Template
-        </button>
-      </div>
     </section>
   );
 }
