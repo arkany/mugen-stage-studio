@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { exportStage } from "../hooks/useTauriCommands";
+// Name the stage and export it.
+//
+// The DEF is generated from the same derivation the preview screen showed, so
+// what is written here is exactly what was approved there.
+
+import { useEffect, useState } from "react";
+import { exportStage, previewDef } from "../hooks/useTauriCommands";
 import type { StageConfig, StageTemplate } from "../types/stage";
 
 interface Props {
@@ -10,30 +15,39 @@ interface Props {
 }
 
 export function PreviewExport({ template, config, setConfig, onBack }: Props) {
+  const [def, setDef] = useState<string | null>(null);
+  const [defError, setDefError] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  useEffect(() => {
+    previewDef(config)
+      .then((text) => {
+        setDef(text);
+        setDefError(null);
+      })
+      .catch((e) => {
+        setDef(null);
+        setDefError(String(e));
+      });
+  }, [config]);
 
   const onExport = async () => {
     setExportMessage(null);
     setExportError(null);
     try {
-      const result = await exportStage(config);
-      setExportMessage(result);
+      setExportMessage(await exportStage(config));
     } catch (e) {
-      // Phase 4a stub returns Err("Export not yet implemented — Phase 4b").
-      // Surfacing the error string is the correct UX for this phase.
       setExportError(String(e));
     }
   };
 
   return (
-    <section className="p-6">
-      <h1 className="text-xl font-semibold mb-2">Preview &amp; export</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Template: <span className="font-medium">{template.displayName}</span>
-      </p>
+    <section className="p-6 max-w-4xl">
+      <h1 className="text-xl font-semibold mb-1">Name &amp; export</h1>
+      <p className="text-sm text-gray-600 mb-4">{template.displayName}</p>
 
-      <div className="space-y-3 mb-6 max-w-md">
+      <div className="grid gap-3 sm:grid-cols-2 mb-6">
         <label className="block">
           <span className="block text-sm font-medium mb-1">Stage name</span>
           <input
@@ -55,7 +69,39 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
             placeholder="Your name"
           />
         </label>
+
+        <label className="block sm:col-span-2">
+          <span className="block text-sm font-medium mb-1">
+            Music <span className="text-gray-500 font-normal">(optional)</span>
+          </span>
+          <input
+            type="text"
+            value={config.music ?? ""}
+            onChange={(e) =>
+              setConfig({ ...config, music: e.target.value || null })
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded"
+            placeholder="sound/yourtrack.ogg"
+          />
+        </label>
       </div>
+
+      {def && (
+        <details className="mb-6" open>
+          <summary className="text-sm font-medium cursor-pointer mb-2">
+            Generated DEF
+          </summary>
+          <pre className="text-xs font-mono bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto max-h-96">
+            {def}
+          </pre>
+        </details>
+      )}
+
+      {defError && (
+        <p className="mb-4 p-3 text-red-700 bg-red-50 border border-red-200 rounded">
+          {defError}
+        </p>
+      )}
 
       <div className="flex gap-2 mb-4">
         <button

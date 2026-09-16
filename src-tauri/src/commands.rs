@@ -1,40 +1,99 @@
 // Tauri command handlers.
 //
-// All three commands compile and return sensible stub responses so the
-// frontend can be wired up before Phase 4b lands real implementations.
+// Every command is a thin shell over `stage_core`: read a file's dimensions,
+// hand the numbers to the core, return what it derived. No geometry lives
+// here, so there is no second place for the camera maths to drift.
+
+use serde::Serialize;
+
+use stage_core::stage::{self, DerivedStage, ImportFit, StageConfig};
+use stage_core::templates::{self, StageTemplate};
 
 use crate::image_check;
-use crate::stage_config::StageConfig;
-use crate::templates::{self, StageTemplate};
 
 #[tauri::command]
 pub fn get_templates() -> Vec<StageTemplate> {
     templates::ALL_TEMPLATES.to_vec()
 }
 
-/// STUB: returns a `StageConfig` whose `conformance_state` is always
-/// `NoImage` until Phase 4b implements `image_check::check_image_conformance`
-/// with real dimension reading.
+/// What the import screen needs after a file pick: the config with real
+/// dimensions filled in, the fit verdict, and — when the image is usable —
+/// the fully derived parameter set to preview.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    pub config: StageConfig,
+    pub fit: ImportFit,
+    pub derived: Option<DerivedStage>,
+}
+
+/// Load a backdrop and derive everything that follows from it.
 ///
-/// The stub does record the inputs (path + template_id) on the returned
-/// config so the frontend can confirm round-trip serialization works.
+/// Unlike the previous version this reads the file for real, so the returned
+/// `fit` reflects the actual image rather than a hardcoded `NoImage`.
 #[tauri::command]
-pub fn load_image(image_path: String, template_id: String) -> StageConfig {
+pub fn load_image(image_path: String, template_id: String) -> Result<ImportResult, String> {
+    let template = templates::by_id(&template_id)
+        .ok_or_else(|| format!("Unknown template: {template_id}"))?;
+
     let mut config = StageConfig::empty_for_template(&template_id);
     config.bg_image_path = Some(image_path.clone());
 
-    // When Phase 4b lands, this stub call will be replaced with real
-    // image dimension reading + conformance classification.
-    if let Some(template) = templates::by_id(&template_id) {
-        config.conformance_state = image_check::check_image_conformance(&image_path, template);
-    }
+    let zoomout = config.zoomout(template);
+    let (dims, fit) = image_check::inspect(&image_path, template.localcoord(), zoomout)?;
 
-    config
+    config.bg_image_width = Some(dims.width);
+    config.bg_image_height = Some(dims.height);
+
+    // Seed the floor-line handle from the template so the preview has
+    // something sensible before the user drags it.
+    config.floor_y = Some(
+        (dims.height as f64 * template.default_floor_ratio as f64).round() as u32,
+    );
+
+    let derived = stage::derive(&config, template);
+    Ok(ImportResult {
+        config,
+        fit,
+        derived,
+    })
 }
 
-/// STUB: always returns an error message until Phase 4b implements SFF
-/// binary generation, DEF serialization, and zip packaging.
+/// Re-derive after the user moves the floor line or changes the zoom.
+///
+/// The frontend never computes a camera value itself; it edits the config and
+/// asks for a fresh derivation.
 #[tauri::command]
-pub fn export_stage(_config: StageConfig) -> Result<String, String> {
-    Err("Export not yet implemented — Phase 4b".to_string())
+pub fn derive_stage(config: StageConfig) -> Result<Option<DerivedStage>, String> {
+    let template = templates::by_id(&config.template_id)
+        .ok_or_else(|| format!("Unknown template: {}", config.template_id))?;
+    Ok(stage::derive(&config, template))
+}
+
+/// Serialize the derived stage to a DEF file body.
+///
+/// This is the half of export that depends on the geometry being right, so it
+/// ships now; SFF binary generation follows. Emitting the DEF alone is already
+/// useful — it can be dropped next to a hand-built SFF.
+#[tauri::command]
+pub fn preview_def(config: StageConfig) -> Result<String, String> {
+    let template = templates::by_id(&config.template_id)
+        .ok_or_else(|| format!("Unknown template: {}", config.template_id))?;
+    let derived = stage::derive(&config, template)
+        .ok_or_else(|| "Load a usable background image first".to_string())?;
+    Ok(stage_core::def::write_def(&config, template, &derived))
+}
+
+/// STUB: SFF v2.01 binary generation is still outstanding.
+///
+/// The axis this will need to write is `derived.axis`, and the matching
+/// `[BG ] start` is `derived.start` — the two must be written as a pair.
+#[tauri::command]
+pub fn export_stage(config: StageConfig) -> Result<String, String> {
+    // Derive first so an unusable config fails here rather than halfway
+    // through writing files.
+    let _ = preview_def(config)?;
+    Err("SFF generation not yet implemented — the DEF is ready, \
+         use `preview_def` to see it."
+        .to_string())
 }

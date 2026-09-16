@@ -1,13 +1,12 @@
 // MUGEN Stage Studio — Tauri backend entry point.
 //
-// Phase 4a scaffold: registers the three command stubs (`get_templates`,
-// `load_image`, `export_stage`) so the React frontend can call them via
-// `invoke`. Phase 4b will replace the stubs with real implementations.
+// The stage geometry, templates and DEF writing all live in the `stage-core`
+// crate; this crate is the desktop shell around them. Keeping them apart means
+// the arithmetic that decides whether a stage actually works is testable
+// without a GUI toolchain — run `cargo test -p stage-core`.
 
 mod commands;
 mod image_check;
-mod stage_config;
-mod templates;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +15,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_templates,
             commands::load_image,
+            commands::derive_stage,
+            commands::preview_def,
             commands::export_stage,
         ])
         .run(tauri::generate_context!())

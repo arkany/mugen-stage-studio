@@ -14,18 +14,35 @@ other and with the background image dimensions:
 | Parameter | Role |
 |---|---|
 | `localcoord` | The coordinate space ruler everything else is measured in |
-| `boundleft` / `boundright` | How far the camera scrolls horizontally — must equal `±(imageWidth - localcoordWidth) / 2` |
-| `boundhigh` | How far the camera scrolls vertically — derived from image height |
+| `boundleft` / `boundright` | How far the camera scrolls horizontally — `±(imageWidth - localcoordWidth / zoomout) / 2` |
+| `boundhigh` | How far the camera may rise — the artwork's top edge in screen space |
 | `zoffset` | Where the floor sits in coordinate space — characters stand here |
-| **Sprite axis (in SFF)** | Must be set to `(imageWidth / 2, imageHeight)` — center-bottom — always |
+| **Sprite axis (in SFF)** | Stage Studio always writes `(imageWidth / 2, imageHeight)` — center-bottom |
+| **`[BG ] start`** | Where that axis is placed. **Coupled to the axis; neither means anything alone.** |
 
-If any one of these is wrong, the stage breaks. The sprite axis is the
-silent killer: it is encoded in the SFF binary and was not being set
-correctly in the original app.
+If any one of these is wrong, the stage breaks.
 
-The correct approach is to offer a small set of **canonical stage templates**
-with all values pre-derived from real reference stages, rather than asking
-users to configure parameters manually.
+> **Correction to the original plan.** The plan named the sprite axis as "the
+> silent killer" and prescribed rewriting it to center-bottom always. That is
+> half a rule. The axis is only an anchor *point*; `[BG ] start` says where
+> that anchor goes, measured from the top of the viewport. Rewriting the axis
+> without recomputing `start` translates the backdrop by the difference — for
+> a 1050-tall image, 1050 units — which puts the artwork above the screen and
+> leaves characters standing in empty space. That is the actual cause of the
+> floating and cut-off backgrounds. With a center-bottom axis the matching
+> value is `start = 0, localcoordHeight`, not `0, 0`.
+>
+> Two further corrections: `zoomout` is a divisor on the viewport and shrinks
+> every bound, so bounds derived without it let the camera scroll past the
+> artwork the moment the stage zooms out; and `zoffset` cannot be a template
+> constant, because it depends on where the horizon happens to sit in the
+> artwork.
+
+The correct approach is to offer a small set of **canonical templates** that
+fix the coordinate space and the camera *feel*, and to **derive** every
+geometric value — bounds, `zoffset`, axis and `start` — from the image the
+user actually supplies. Hardcoding those values only ever works for the one
+reference image they were copied from.
 
 ---
 
