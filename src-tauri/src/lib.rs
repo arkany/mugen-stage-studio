@@ -6,17 +6,20 @@
 // without a GUI toolchain — run `cargo test -p stage-core`.
 
 mod commands;
+mod export;
 mod image_check;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_templates,
             commands::load_image,
             commands::derive_stage,
             commands::preview_def,
+            commands::default_output_dir,
             commands::export_stage,
         ])
         .run(tauri::generate_context!())

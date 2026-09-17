@@ -5,10 +5,9 @@ mathematically correct parameters. Replaces the broken Swift/macOS app
 with a Tauri 2 + Rust + React 19 stack so Windows, macOS, and Linux all
 ship from one codebase.
 
-> **Status** — the geometry, templates, image import, preview canvas and DEF
-> generation are implemented and tested. SFF binary generation is the
-> remaining gap, so export produces parameters but not yet a packaged stage.
-> See [`rebuild-plan.md`](./rebuild-plan.md) for the phase plan.
+> **Status** — export works end to end: pick a template, drop in an image,
+> place the floor, and get a `.def` and a `.sff` you can import. See
+> [`rebuild-plan.md`](./rebuild-plan.md) for the phase plan.
 
 ## Architecture
 
@@ -97,13 +96,20 @@ Subsequent runs are fast (Vite HMR + Rust incremental compile).
 
 ## What's still missing
 
-- **SFF v2.01 binary generation** — the one thing standing between this and a
-  complete exported stage. The axis it must write is `DerivedStage::axis`, and
-  the `[BG ] start` that pairs with it is `DerivedStage::start`; the two are
-  meaningless apart.
-- 240×100 thumbnail generation (sprite group 9000, sprite 1)
-- Writing the scaled backdrop to disk when an image needed upscaling
 - Multi-BG-element / parallax layer editing. `geometry::horizontal_bound_multi`
   already implements the per-layer bound rule the UI would need.
-- Dialog-plugin file picker. The import screen works from the browser file
-  input today; the exporter will need a real on-disk path.
+- Animated BG elements, tiling, and the `[BGCtrlDef]` block.
+- **Nothing here has been loaded into IKEMEN GO yet.** The exported files
+  round-trip through an independent reader and match the two reference stages
+  that are known to work, but that is not the same as the engine accepting
+  them. That test is the next thing worth doing.
+
+## Credit
+
+The SFF v2.01 writer in
+[`stage-core/src/sff.rs`](./src-tauri/stage-core/src/sff.rs) is ported from
+`SFFWriter.swift` in [IKEMEN Lab](https://github.com/arkany/IKEMEN-LAB),
+which is the implementation whose output is known to import into IKEMEN GO.
+The byte layout is deliberately identical. The difference is the axis: Lab
+writes `(0, 0)` and compensates in the DEF's `start`, while Stage Studio
+writes the center-bottom axis and the `start` that pairs with it.

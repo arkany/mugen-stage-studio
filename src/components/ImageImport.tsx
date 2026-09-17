@@ -10,7 +10,9 @@
 // and the camera values are derived from that size.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { deriveStage } from "../hooks/useTauriCommands";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { deriveStage, loadImage } from "../hooks/useTauriCommands";
 import { StagePreview } from "./StagePreview";
 import type { DerivedStage, StageConfig, StageTemplate } from "../types/stage";
 
@@ -39,14 +41,9 @@ export function ImageImport({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [derived, setDerived] = useState<DerivedStage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tooSmall, setTooSmall] = useState<string | null>(null);
   // Drags fire faster than the round trip returns; only the newest wins.
   const requestSeq = useRef(0);
-
-  useEffect(() => {
-    return () => {
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    };
-  }, [imageUrl]);
 
   useEffect(() => {
     if (config.bgImageWidth == null || config.bgImageHeight == null) {
@@ -56,62 +53,53 @@ export function ImageImport({
     const seq = ++requestSeq.current;
     deriveStage(config)
       .then((d) => {
-        if (seq === requestSeq.current) {
-          setDerived(d);
-          setError(null);
-        }
+        if (seq !== requestSeq.current) return;
+        setDerived(d);
+        setError(null);
       })
       .catch((e) => {
         if (seq === requestSeq.current) setError(String(e));
       });
   }, [config]);
 
-  const onFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setError(null);
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const onPick = useCallback(async () => {
+    setError(null);
+    setTooSmall(null);
+    try {
+      const picked = await open({
+        multiple: false,
+        directory: false,
+        filters: [
+          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp"] },
+        ],
+      });
+      if (typeof picked !== "string") return;
 
-      const url = URL.createObjectURL(file);
-      const probe = new Image();
-      probe.onload = () => {
-        if (imageUrl) URL.revokeObjectURL(imageUrl);
-        setImageUrl(url);
-        setConfig({
-          ...config,
-          // `file.name` is not a real path — the exporter will need one from
-          // the dialog plugin. Everything on this screen works from the
-          // dimensions alone, so importing is not blocked on that.
-          bgImagePath: file.name,
-          bgImageWidth: probe.naturalWidth,
-          bgImageHeight: probe.naturalHeight,
-          floorY: Math.round(probe.naturalHeight * template.defaultFloorRatio),
-        });
-      };
-      probe.onerror = () => {
-        URL.revokeObjectURL(url);
-        setError("That file could not be read as an image.");
-      };
-      probe.src = url;
-    },
-    [config, imageUrl, setConfig, template.defaultFloorRatio],
-  );
+      // The backend reads the real file, so it — not the browser — decides the
+      // dimensions every camera value is derived from.
+      const result = await loadImage(picked, template.id);
+      if (result.fit.type === "TooSmall") {
+        setTooSmall(
+          `That image is too small for this viewport. Generate at ${result.fit.minWidth}x${result.fit.minHeight} or larger.`,
+        );
+        setDerived(null);
+        return;
+      }
+      setImageUrl(convertFileSrc(picked));
+      setConfig(result.config);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [setConfig, template.id]);
 
-  const minW = Math.ceil(
-    template.localcoordW / (config.zoomoutOverride ?? template.zoomout),
-  );
-  const minH = Math.ceil(
-    template.localcoordH / (config.zoomoutOverride ?? template.zoomout),
-  );
+  const zoomout = config.zoomoutOverride ?? template.zoomout;
+  const minW = Math.ceil(template.localcoordW / zoomout);
+  const minH = Math.ceil(template.localcoordH / zoomout);
 
-  const tooSmall =
-    config.bgImageWidth != null &&
-    config.bgImageHeight != null &&
-    derived == null &&
-    error == null;
+  const fileName = config.bgImagePath?.split(/[\\/]/).pop() ?? null;
 
   return (
-    <section className="p-6 max-w-5xl">
+    <section className="p-6 max-w-6xl">
       <h1 className="text-xl font-semibold mb-1">Import background</h1>
       <p className="text-sm text-gray-600 mb-4">
         {template.displayName} · viewport {template.localcoordW}×
@@ -119,10 +107,18 @@ export function ImageImport({
         {template.recommendedBgWidth}×{template.recommendedBgHeight}
       </p>
 
-      <label className="block mb-4">
-        <span className="block text-sm font-medium mb-1">Background image</span>
-        <input type="file" accept="image/*" onChange={onFileChange} />
-      </label>
+      <div className="flex items-center gap-3 mb-4">
+        <button
+          type="button"
+          onClick={onPick}
+          className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-50"
+        >
+          Choose image…
+        </button>
+        <span className="text-sm text-gray-600">
+          {fileName ?? "No image chosen"}
+        </span>
+      </div>
 
       {error && (
         <p className="mb-4 p-3 text-red-700 bg-red-50 border border-red-200 rounded">
@@ -132,8 +128,7 @@ export function ImageImport({
 
       {tooSmall && (
         <p className="mb-4 p-3 text-red-700 bg-red-50 border border-red-200 rounded">
-          {config.bgImageWidth}×{config.bgImageHeight} is too small to fill this
-          viewport. Generate at {minW}×{minH} or larger.
+          {tooSmall}
         </p>
       )}
 

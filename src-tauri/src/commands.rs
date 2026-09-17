@@ -9,6 +9,7 @@ use serde::Serialize;
 use stage_core::stage::{self, DerivedStage, ImportFit, StageConfig};
 use stage_core::templates::{self, StageTemplate};
 
+use crate::export::{self, ExportResult};
 use crate::image_check;
 
 #[tauri::command]
@@ -84,16 +85,35 @@ pub fn preview_def(config: StageConfig) -> Result<String, String> {
     Ok(stage_core::def::write_def(&config, template, &derived))
 }
 
-/// STUB: SFF v2.01 binary generation is still outstanding.
-///
-/// The axis this will need to write is `derived.axis`, and the matching
-/// `[BG ] start` is `derived.start` — the two must be written as a pair.
+/// A sensible place to put the exported stage when the user hasn't chosen one.
 #[tauri::command]
-pub fn export_stage(config: StageConfig) -> Result<String, String> {
-    // Derive first so an unusable config fails here rather than halfway
-    // through writing files.
-    let _ = preview_def(config)?;
-    Err("SFF generation not yet implemented — the DEF is ready, \
-         use `preview_def` to see it."
-        .to_string())
+pub fn default_output_dir() -> String {
+    let base = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    std::path::Path::new(&base)
+        .join("MugenStageStudio")
+        .display()
+        .to_string()
+}
+
+/// Write the stage's `.def` and `.sff` into `output_dir`.
+///
+/// The sprite axis written into the SFF is `derived.axis`, and the `[BG ]
+/// start` written into the DEF is `derived.start`. They come from one
+/// derivation and are written in one call, which is the point — they are only
+/// meaningful as a pair.
+#[tauri::command]
+pub fn export_stage(config: StageConfig, output_dir: String) -> Result<ExportResult, String> {
+    let template = templates::by_id(&config.template_id)
+        .ok_or_else(|| format!("Unknown template: {}", config.template_id))?;
+    let derived = stage::derive(&config, template)
+        .ok_or_else(|| "Load a usable background image first".to_string())?;
+
+    export::export_stage(
+        &config,
+        template,
+        &derived,
+        std::path::Path::new(&output_dir),
+    )
 }

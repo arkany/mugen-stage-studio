@@ -9,6 +9,7 @@
 
 pub mod def;
 pub mod geometry;
+pub mod sff;
 pub mod stage;
 pub mod templates;
 
@@ -17,5 +18,6 @@ pub use geometry::{
     floor_y_for_zoffset, minimum_image_size, Axis, CameraBounds, Localcoord, Placement, Start,
 };
 pub use def::write_def;
+pub use sff::{write_sff, SpriteEntry};
 pub use stage::{assess_fit, derive, DerivedStage, ImportFit, StageConfig, Warning, WarningCode};
 pub use templates::{by_id, StageTemplate, TemplateConfidence, ALL_TEMPLATES};

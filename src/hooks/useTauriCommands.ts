@@ -7,6 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   DerivedStage,
+  ExportResult,
   ImportResult,
   StageConfig,
   StageTemplate,
@@ -33,6 +34,15 @@ export function previewDef(config: StageConfig): Promise<string> {
   return invoke<string>("preview_def", { config });
 }
 
-export function exportStage(config: StageConfig): Promise<string> {
-  return invoke<string>("export_stage", { config });
+export function defaultOutputDir(): Promise<string> {
+  return invoke<string>("default_output_dir");
+}
+
+/** Writes the .def and .sff. The SFF axis and the DEF start come from one
+ *  derivation, so they cannot disagree. */
+export function exportStage(
+  config: StageConfig,
+  outputDir: string,
+): Promise<ExportResult> {
+  return invoke<ExportResult>("export_stage", { config, outputDir });
 }

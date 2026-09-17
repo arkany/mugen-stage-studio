@@ -128,6 +128,15 @@ export interface DerivedStage {
   warnings: Warning[];
 }
 
+export interface ExportResult {
+  directory: string;
+  defPath: string;
+  sffPath: string;
+  backdropWidth: number;
+  backdropHeight: number;
+  resampled: boolean;
+}
+
 export interface ImportResult {
   config: StageConfig;
   fit: ImportFit;
