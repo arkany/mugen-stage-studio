@@ -101,7 +101,7 @@ export function ImageImport({
   return (
     <section className="p-6 max-w-6xl">
       <h1 className="text-xl font-semibold mb-1">Import background</h1>
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-600 mb-4 dark:text-gray-300">
         {template.displayName} · viewport {template.localcoordW}×
         {template.localcoordH} · minimum image {minW}×{minH} · suggested{" "}
         {template.recommendedBgWidth}×{template.recommendedBgHeight}
@@ -111,23 +111,23 @@ export function ImageImport({
         <button
           type="button"
           onClick={onPick}
-          className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-50"
+          className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-900"
         >
           Choose image…
         </button>
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 dark:text-gray-300">
           {fileName ?? "No image chosen"}
         </span>
       </div>
 
       {error && (
-        <p className="mb-4 p-3 text-red-700 bg-red-50 border border-red-200 rounded">
+        <p className="mb-4 p-3 text-red-700 bg-red-50 border border-red-200 rounded dark:text-red-300 dark:bg-red-950/50 dark:border-red-900">
           {error}
         </p>
       )}
 
       {tooSmall && (
-        <p className="mb-4 p-3 text-red-700 bg-red-50 border border-red-200 rounded">
+        <p className="mb-4 p-3 text-red-700 bg-red-50 border border-red-200 rounded dark:text-red-300 dark:bg-red-950/50 dark:border-red-900">
           {tooSmall}
         </p>
       )}
@@ -145,7 +145,7 @@ export function ImageImport({
             <label className="block">
               <span className="block text-sm font-medium mb-1">Stage zoom</span>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded"
+                className="w-full px-3 py-2 border border-gray-300 rounded dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                 value={config.zoomoutOverride ?? ""}
                 onChange={(e) =>
                   setConfig({
@@ -161,7 +161,7 @@ export function ImageImport({
                   </option>
                 ))}
               </select>
-              <span className="block text-xs text-gray-500 mt-1">
+              <span className="block text-xs text-gray-500 mt-1 dark:text-gray-400">
                 Zooming out shows more than the viewport, so the camera bounds
                 shrink to match. This is why zoom-enabled stages need a larger
                 backdrop.
@@ -178,7 +178,7 @@ export function ImageImport({
           {derived.warnings.map((w) => (
             <li
               key={w.code}
-              className="p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded"
+              className="p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded dark:text-amber-300 dark:bg-amber-950/50 dark:border-amber-900"
             >
               {w.message}
             </li>
@@ -190,7 +190,7 @@ export function ImageImport({
         <button
           type="button"
           onClick={onBack}
-          className="px-4 py-2 border border-gray-400 rounded"
+          className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-900"
         >
           Back
         </button>
@@ -198,7 +198,7 @@ export function ImageImport({
           type="button"
           onClick={onContinue}
           disabled={!derived}
-          className="px-4 py-2 bg-blue-600 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed dark:bg-blue-500 dark:hover:bg-blue-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
         >
           Continue
         </button>
@@ -222,17 +222,17 @@ function DerivedPanel({ derived }: { derived: DerivedStage }) {
   ];
 
   return (
-    <div className="border border-gray-200 rounded bg-gray-50 p-3">
+    <div className="border border-gray-200 rounded bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
       <h2 className="text-sm font-medium mb-2">Derived parameters</h2>
       <dl className="text-xs font-mono space-y-1">
         {rows.map(([k, v]) => (
           <div key={k} className="flex justify-between gap-3">
-            <dt className="text-gray-500">{k}</dt>
-            <dd className="text-gray-900">{v}</dd>
+            <dt className="text-gray-500 dark:text-gray-400">{k}</dt>
+            <dd className="text-gray-900 dark:text-gray-100">{v}</dd>
           </div>
         ))}
       </dl>
-      <p className="text-xs text-gray-500 mt-2">
+      <p className="text-xs text-gray-500 mt-2 dark:text-gray-400">
         Recomputed from the artwork on every change. Axis and start are always
         written as a pair.
       </p>

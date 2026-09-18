@@ -80,7 +80,7 @@ npm run tauri dev
 The first `tauri dev` run takes 1–3 minutes to compile the debug bundle.
 Subsequent runs are fast (Vite HMR + Rust incremental compile).
 
-## What's in this scaffold
+## What's implemented
 
 | Path | Contents |
 |---|---|

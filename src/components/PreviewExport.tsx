@@ -71,7 +71,7 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
   return (
     <section className="p-6 max-w-4xl">
       <h1 className="text-xl font-semibold mb-1">Name &amp; export</h1>
-      <p className="text-sm text-gray-600 mb-4">{template.displayName}</p>
+      <p className="text-sm text-gray-600 mb-4 dark:text-gray-300">{template.displayName}</p>
 
       <div className="grid gap-3 sm:grid-cols-2 mb-4">
         <label className="block">
@@ -80,7 +80,7 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
             type="text"
             value={config.name}
             onChange={(e) => setConfig({ ...config, name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
+            className="w-full px-3 py-2 border border-gray-300 rounded bg-white text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
             placeholder="My new stage"
           />
         </label>
@@ -91,14 +91,14 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
             type="text"
             value={config.author}
             onChange={(e) => setConfig({ ...config, author: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
+            className="w-full px-3 py-2 border border-gray-300 rounded bg-white text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
             placeholder="Your name"
           />
         </label>
 
         <label className="block sm:col-span-2">
           <span className="block text-sm font-medium mb-1">
-            Music <span className="text-gray-500 font-normal">(optional)</span>
+            Music <span className="text-gray-500 font-normal dark:text-gray-400">(optional)</span>
           </span>
           <input
             type="text"
@@ -106,7 +106,7 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
             onChange={(e) =>
               setConfig({ ...config, music: e.target.value || null })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded"
+            className="w-full px-3 py-2 border border-gray-300 rounded bg-white text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
             placeholder="sound/yourtrack.ogg"
           />
         </label>
@@ -119,18 +119,18 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
             type="text"
             value={outputDir}
             onChange={(e) => setOutputDir(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded font-mono text-xs"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded font-mono text-xs bg-white text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
             placeholder="Choose a folder"
           />
           <button
             type="button"
             onClick={onChooseDir}
-            className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-900"
           >
             Browse…
           </button>
         </div>
-        <span className="block text-xs text-gray-500 mt-1">
+        <span className="block text-xs text-gray-500 mt-1 dark:text-gray-400">
           Writes a <code>.def</code> and a <code>.sff</code>. Point IKEMEN Lab
           at this folder to import the stage.
         </span>
@@ -148,7 +148,7 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
       )}
 
       {defError && (
-        <p className="mb-4 p-3 text-red-700 bg-red-50 border border-red-200 rounded">
+        <p className="mb-4 p-3 text-red-700 bg-red-50 border border-red-200 rounded dark:text-red-300 dark:bg-red-950/50 dark:border-red-900">
           {defError}
         </p>
       )}
@@ -157,7 +157,7 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
         <button
           type="button"
           onClick={onBack}
-          className="px-4 py-2 border border-gray-400 rounded"
+          className="px-4 py-2 border border-gray-400 rounded hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-900"
         >
           Back
         </button>
@@ -165,14 +165,14 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
           type="button"
           onClick={onExport}
           disabled={busy || !outputDir}
-          className="px-4 py-2 bg-blue-600 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed dark:bg-blue-500 dark:hover:bg-blue-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
         >
           {busy ? "Exporting…" : "Export"}
         </button>
       </div>
 
       {result && (
-        <div className="text-green-800 bg-green-50 border border-green-200 rounded p-3 text-sm">
+        <div className="text-green-800 bg-green-50 border border-green-200 rounded p-3 text-sm dark:text-green-300 dark:bg-green-950/50 dark:border-green-900">
           <p className="font-medium mb-1">
             Exported {result.backdropWidth}×{result.backdropHeight} backdrop
             {result.resampled ? " (resampled to cover the viewport)" : ""}.
@@ -182,7 +182,7 @@ export function PreviewExport({ template, config, setConfig, onBack }: Props) {
         </div>
       )}
       {exportError && (
-        <p className="text-red-700 bg-red-50 border border-red-200 rounded p-3">
+        <p className="text-red-700 bg-red-50 border border-red-200 rounded p-3 dark:text-red-300 dark:bg-red-950/50 dark:border-red-900">
           {exportError}
         </p>
       )}
