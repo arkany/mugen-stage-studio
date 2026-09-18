@@ -2,5 +2,26 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Tell the engine which palette to paint the things Tailwind can't reach:
+   scrollbars, the native <select> popup, and the file picker button. Without
+   this they stay light while everything around them goes dark. */
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+/* The app shell paints its own background, but overscroll and the area behind
+   a short page come from the body. */
+body {
+  background-color: #ffffff;
+}
+
+:root.dark body {
+  background-color: oklch(13% 0.028 261.692); /* gray-950, matching <main> */
+}
+
 /* Project-specific styles can go here. Tailwind v4 reads CSS variables from
    the @import above; no further config file is required. */
