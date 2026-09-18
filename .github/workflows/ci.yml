@@ -1,0 +1,55 @@
+# Fast checks for the two things that can break without a macOS runner: the
+# frontend type-checks/builds, and the pure-arithmetic core crate's tests.
+#
+# The Tauri app itself is deliberately not built here. It needs a GTK/WebKit
+# toolchain on Linux and is only ever shipped from macOS, so building it would
+# cost minutes to prove something no one relies on. `stage-core` is a separate
+# crate precisely so its tests run anywhere - see the note in src-tauri/Cargo.toml.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Only the checkout needs the token.
+permissions:
+  contents: read
+
+# A second push supersedes the first; don't burn minutes finishing the old one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # `npm run build` is `tsc && vite build`, so this is the type check too.
+      - run: npm run build
+
+  core:
+    name: stage-core tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      # Rust, cargo and clippy ship with the ubuntu-latest runner image, so
+      # there is no toolchain action to install or pin here.
+      - run: cargo test -p stage-core
+
+      - run: cargo clippy -p stage-core --all-targets -- -D warnings
