@@ -5,20 +5,39 @@ mathematically correct parameters. Replaces the broken Swift/macOS app
 with a Tauri 2 + Rust + React 19 stack so Windows, macOS, and Linux all
 ship from one codebase.
 
-> **Phase 4a scaffold** — this is the architectural skeleton. SFF binary
-> generation, DEF serialization, image conformance, and the preview canvas
-> are stubs until Phase 4b. See [`rebuild-plan.md`](./rebuild-plan.md) for
-> the full phase plan.
+> **Status** — export works end to end: pick a template, drop in an image,
+> place the floor, and get a `.def` and a `.sff` you can import. See
+> [`rebuild-plan.md`](./rebuild-plan.md) for the phase plan.
 
 ## Architecture
 
-- **Rust backend** ([`src-tauri/`](./src-tauri/)) — owns format logic, file
-  I/O, and the typed `StageTemplate` constants. Templates are compile-time
-  constants, not user-configurable values.
+- **`stage-core`** ([`src-tauri/stage-core/`](./src-tauri/stage-core/)) — the
+  coordinate model, camera derivations, templates and DEF writer. Pure
+  arithmetic with no Tauri and no image decoding, so `cargo test -p
+  stage-core` runs the logic that decides whether a stage works without
+  needing a GUI toolchain. The web validator will share this crate.
+- **Rust backend** ([`src-tauri/src/`](./src-tauri/src/)) — the desktop shell:
+  reads image dimensions, forwards to `stage-core`, owns file I/O.
 - **React frontend** ([`src/`](./src/)) — three step-based screens
   (`TemplatePicker` → `ImageImport` → `PreviewExport`) talking to Rust via
   typed `invoke` wrappers in [`src/hooks/useTauriCommands.ts`](./src/hooks/useTauriCommands.ts).
+  The frontend holds **no** copy of the geometry — it edits a `StageConfig`
+  and asks the backend to re-derive, so the preview can never disagree with
+  the exported file.
 - **Tailwind v4** for styling via the Vite plugin.
+
+## How it works
+
+You pick a target resolution, drop in a background image at whatever size your
+image generator produced, and drag the floor line onto the ground in the
+artwork. Everything else — `boundleft`/`boundright`, `boundhigh`, `zoffset`,
+the sprite axis and the matching `[BG ] start` — is derived from the image's
+real dimensions and that floor line. None of them is a template constant,
+because none of them is a property of the template.
+
+The preview draws the viewport, the camera's full reach and the lifebar zone
+over your artwork, so a backdrop that is mounted wrong or a floor line in the
+sky is visible before you export.
 
 ## Documentation
 
@@ -42,6 +61,9 @@ Read in this order:
 From this directory:
 
 ```bash
+# The logic that decides whether a stage works (32 tests, no GUI deps)
+(cd src-tauri && cargo test -p stage-core)
+
 # Backend builds clean
 (cd src-tauri && cargo build)
 
@@ -62,19 +84,32 @@ Subsequent runs are fast (Vite HMR + Rust incremental compile).
 
 | Path | Contents |
 |---|---|
-| [`src-tauri/src/templates.rs`](./src-tauri/src/templates.rs) | 5 `StageTemplate` constants (T1, T2, T3_STANDARD, T3_WIDE, T4) populated from `mugen-stage-skill.md` Section 2 |
-| [`src-tauri/src/commands.rs`](./src-tauri/src/commands.rs) | 3 Tauri commands: `get_templates`, `load_image`, `export_stage` (last two are typed stubs for Phase 4b) |
-| [`src-tauri/src/stage_config.rs`](./src-tauri/src/stage_config.rs) | `StageConfig` + `ConformanceState` shared structs |
-| [`src-tauri/src/image_check.rs`](./src-tauri/src/image_check.rs) | Conformance API surface — stub returning `NoImage` until Phase 4b |
+| [`src-tauri/stage-core/src/geometry.rs`](./src-tauri/stage-core/src/geometry.rs) | The screen-space coordinate model and every camera derivation. **Read this first.** |
+| [`src-tauri/stage-core/src/templates.rs`](./src-tauri/stage-core/src/templates.rs) | 4 `StageTemplate` constants — camera feel only, no geometry |
+| [`src-tauri/stage-core/src/stage.rs`](./src-tauri/stage-core/src/stage.rs) | `StageConfig`, `ImportFit`, and the `derive` entry point |
+| [`src-tauri/stage-core/src/def.rs`](./src-tauri/stage-core/src/def.rs) | DEF serialization |
+| [`src-tauri/src/commands.rs`](./src-tauri/src/commands.rs) | Tauri commands: `get_templates`, `load_image`, `derive_stage`, `preview_def`, `export_stage` |
+| [`src-tauri/src/image_check.rs`](./src-tauri/src/image_check.rs) | Header-only image dimension reads |
+| [`src/components/StagePreview.tsx`](./src/components/StagePreview.tsx) | The preview canvas and draggable floor line |
 | [`src/types/stage.ts`](./src/types/stage.ts) | TypeScript mirror of the Rust structs |
-| [`src/components/`](./src/components/) | Three React step screens |
+| [`tools/`](./tools/) | Phase 1 parser and the dataset re-validator |
 
-## What's deliberately absent (Phase 4b scope)
+## What's still missing
 
-- SFF v2.01 binary generation
-- DEF file serialization
-- Real image dimension reading, crop, extend
-- 240×100 thumbnail generation (sprite group 9000, sprite 1)
-- Visual preview canvas (localcoord viewport overlaid on background)
-- Multi-BG-element editing
-- Dialog-plugin file picker (currently uses `<input type="file">`)
+- Multi-BG-element / parallax layer editing. `geometry::horizontal_bound_multi`
+  already implements the per-layer bound rule the UI would need.
+- Animated BG elements, tiling, and the `[BGCtrlDef]` block.
+- **Nothing here has been loaded into IKEMEN GO yet.** The exported files
+  round-trip through an independent reader and match the two reference stages
+  that are known to work, but that is not the same as the engine accepting
+  them. That test is the next thing worth doing.
+
+## Credit
+
+The SFF v2.01 writer in
+[`stage-core/src/sff.rs`](./src-tauri/stage-core/src/sff.rs) is ported from
+`SFFWriter.swift` in [IKEMEN Lab](https://github.com/arkany/IKEMEN-LAB),
+which is the implementation whose output is known to import into IKEMEN GO.
+The byte layout is deliberately identical. The difference is the axis: Lab
+writes `(0, 0)` and compensates in the DEF's `start`, while Stage Studio
+writes the center-bottom axis and the `start` that pairs with it.

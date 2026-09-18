@@ -18,8 +18,18 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+stage-core = { path = "stage-core" }
+# Header-only dimension reads on import; full decode lands with the exporter.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+
+# `stage-core` holds the geometry and template logic. It is a separate crate so
+# `cargo test -p stage-core` runs the arithmetic without needing a working
+# GTK/WebKit toolchain, and so the web validator can share it later.
+[workspace]
+members = ["stage-core"]
 

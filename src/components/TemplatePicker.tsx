@@ -53,14 +53,18 @@ export function TemplatePicker({
                   <div>
                     <div className="font-medium">{t.displayName}</div>
                     <div className="text-sm text-gray-600">
-                      localcoord {t.localcoordW}×{t.localcoordH} · image {t.bgWidth}×{t.bgHeight}
+                      viewport {t.localcoordW}×{t.localcoordH} · suggested
+                      backdrop {t.recommendedBgWidth}×{t.recommendedBgHeight}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      Source: {t.sourceStage}
-                      {t.sourceAuthor && t.sourceAuthor !== "(none — no source at this resolution)"
-                        ? ` (${t.sourceAuthor})`
-                        : ""}
+                      Camera feel from {t.sourceStage}
+                      {t.sourceAuthor.startsWith("(") ? "" : ` (${t.sourceAuthor})`}
+                      {" · "}
+                      bounds and zoffset are derived from your image
                     </div>
+                    {t.notes && (
+                      <div className="text-xs text-gray-400 mt-1">{t.notes}</div>
+                    )}
                   </div>
                   <span
                     className={
