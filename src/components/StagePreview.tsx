@@ -74,7 +74,7 @@ export function StagePreview({
       <svg
         ref={svgRef}
         viewBox={`0 0 ${bgWidth} ${bgHeight}`}
-        className="w-full border border-gray-300 rounded bg-gray-100 touch-none select-none"
+        className="w-full border border-gray-300 rounded bg-gray-100 touch-none select-none dark:border-gray-700 dark:bg-gray-900"
         role="img"
         aria-label="Stage preview with viewport and floor line"
       >
@@ -171,7 +171,7 @@ export function StagePreview({
         />
       </svg>
 
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
         <Key color="#22c55e" label="Viewport at rest" />
         <Key color="#38bdf8" label="Camera reach" />
         <Key color="#f59e0b" label="Floor line — drag to place the ground" />
