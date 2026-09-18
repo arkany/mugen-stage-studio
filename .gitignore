@@ -27,3 +27,7 @@ dist-ssr
 xcuserdata/
 *.xcuserstate
 DerivedData/
+
+# Python bytecode
+__pycache__/
+*.pyc
