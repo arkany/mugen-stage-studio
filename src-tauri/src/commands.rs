@@ -1,247 +1,119 @@
-use crate::def_writer;
+// Tauri command handlers.
+//
+// Every command is a thin shell over `stage_core`: read a file's dimensions,
+// hand the numbers to the core, return what it derived. No geometry lives
+// here, so there is no second place for the camera maths to drift.
+
+use serde::Serialize;
+
+use stage_core::stage::{self, DerivedStage, ImportFit, StageConfig};
+use stage_core::templates::{self, StageTemplate};
+
+use crate::export::{self, ExportResult};
 use crate::image_check;
-use crate::sff_writer;
-use crate::stage_config::{ConformanceState, StageConfig};
-use crate::templates::{self, StageTemplate};
-use std::fs;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use tauri_plugin_dialog::DialogExt;
-use zip::write::SimpleFileOptions;
 
 #[tauri::command]
 pub fn get_templates() -> Vec<StageTemplate> {
     templates::ALL_TEMPLATES.to_vec()
 }
 
+/// What the import screen needs after a file pick: the config with real
+/// dimensions filled in, the fit verdict, and — when the image is usable —
+/// the fully derived parameter set to preview.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    pub config: StageConfig,
+    pub fit: ImportFit,
+    pub derived: Option<DerivedStage>,
+}
+
+/// Load a backdrop and derive everything that follows from it.
+///
+/// Unlike the previous version this reads the file for real, so the returned
+/// `fit` reflects the actual image rather than a hardcoded `NoImage`.
 #[tauri::command]
-pub async fn load_image(app: tauri::AppHandle, template_id: String) -> Result<StageConfig, String> {
+pub fn load_image(image_path: String, template_id: String) -> Result<ImportResult, String> {
     let template = templates::by_id(&template_id)
-        .ok_or_else(|| format!("Unknown stage template: {template_id}"))?;
-    let image_path = app
-        .dialog()
-        .file()
-        .add_filter("Images", &["png", "jpg", "jpeg"])
-        .blocking_pick_file()
-        .ok_or_else(|| "Image selection cancelled".to_string())?
-        .into_path()
-        .map_err(|e| format!("Selected image path is not available: {e}"))?;
-    let image_path = image_path.to_string_lossy().into_owned();
-    let dimensions = image_check::read_dimensions(&image_path)
-        .ok_or_else(|| "Could not read PNG/JPEG image dimensions".to_string())?;
+        .ok_or_else(|| format!("Unknown template: {template_id}"))?;
+
     let mut config = StageConfig::empty_for_template(&template_id);
     config.bg_image_path = Some(image_path.clone());
-    config.bg_image_width = Some(dimensions.0);
-    config.bg_image_height = Some(dimensions.1);
-    config.conformance_state = image_check::check_image_conformance(&image_path, template);
-    Ok(config)
+
+    let zoomout = config.zoomout(template);
+    let (dims, fit) = image_check::inspect(&image_path, template.localcoord(), zoomout)?;
+
+    config.bg_image_width = Some(dims.width);
+    config.bg_image_height = Some(dims.height);
+
+    // Seed the floor-line handle from the template so the preview has
+    // something sensible before the user drags it.
+    config.floor_y = Some(
+        (dims.height as f64 * template.default_floor_ratio as f64).round() as u32,
+    );
+
+    let derived = stage::derive(&config, template);
+    Ok(ImportResult {
+        config,
+        fit,
+        derived,
+    })
 }
 
+/// Re-derive after the user moves the floor line or changes the zoom.
+///
+/// The frontend never computes a camera value itself; it edits the config and
+/// asks for a fresh derivation.
 #[tauri::command]
-pub async fn export_stage(app: tauri::AppHandle, config: StageConfig) -> Result<String, String> {
-    let output_dir = app
-        .dialog()
-        .file()
-        .set_title("Choose export folder")
-        .blocking_pick_folder()
-        .ok_or_else(|| "Export cancelled".to_string())?
-        .into_path()
-        .map_err(|e| format!("Selected output folder is not available: {e}"))?;
-
-    export_stage_to_dir(config, &output_dir)
-}
-
-fn export_stage_to_dir(_config: StageConfig, _output_dir: &Path) -> Result<String, String> {
-    let config = _config;
-    if config.name.trim().is_empty() {
-        return Err("Stage name is required".to_string());
-    }
+pub fn derive_stage(config: StageConfig) -> Result<Option<DerivedStage>, String> {
     let template = templates::by_id(&config.template_id)
-        .ok_or_else(|| format!("Unknown stage template: {}", config.template_id))?;
-    let bg_image_path = config
-        .bg_image_path
-        .as_deref()
-        .ok_or_else(|| "Choose a background image before exporting".to_string())?;
-    if !matches!(
-        config.conformance_state,
-        ConformanceState::Correct
-            | ConformanceState::FixableWithCrop { .. }
-            | ConformanceState::FixableWithExtend { .. }
-    ) {
-        return Err("Choose an image that matches, can be cropped, or can be padded".to_string());
-    }
+        .ok_or_else(|| format!("Unknown template: {}", config.template_id))?;
+    Ok(stage::derive(&config, template))
+}
 
-    let slug = stage_slug(&config.name);
-    let sff_filename = format!("{slug}.sff");
-    let def_path: PathBuf = _output_dir.join(format!("{slug}.def"));
-    let sff_path: PathBuf = _output_dir.join(&sff_filename);
-    let zip_path: PathBuf = _output_dir.join(format!("{slug}.zip"));
+/// Serialize the derived stage to a DEF file body.
+///
+/// This is the half of export that depends on the geometry being right, so it
+/// ships now; SFF binary generation follows. Emitting the DEF alone is already
+/// useful — it can be dropped next to a hand-built SFF.
+#[tauri::command]
+pub fn preview_def(config: StageConfig) -> Result<String, String> {
+    let template = templates::by_id(&config.template_id)
+        .ok_or_else(|| format!("Unknown template: {}", config.template_id))?;
+    let derived = stage::derive(&config, template)
+        .ok_or_else(|| "Load a usable background image first".to_string())?;
+    Ok(stage_core::def::write_def(&config, template, &derived))
+}
 
-    sff_writer::write_sff(&sff_path, bg_image_path, template, &config.conformance_state)?;
-    def_writer::write_def(
-        &def_path,
-        &sff_filename,
-        config.name.trim(),
-        config.author.trim(),
-        config.music.as_deref(),
+/// A sensible place to put the exported stage when the user hasn't chosen one.
+#[tauri::command]
+pub fn default_output_dir() -> String {
+    let base = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    std::path::Path::new(&base)
+        .join("MugenStageStudio")
+        .display()
+        .to_string()
+}
+
+/// Write the stage's `.def` and `.sff` into `output_dir`.
+///
+/// The sprite axis written into the SFF is `derived.axis`, and the `[BG ]
+/// start` written into the DEF is `derived.start`. They come from one
+/// derivation and are written in one call, which is the point — they are only
+/// meaningful as a pair.
+#[tauri::command]
+pub fn export_stage(config: StageConfig, output_dir: String) -> Result<ExportResult, String> {
+    let template = templates::by_id(&config.template_id)
+        .ok_or_else(|| format!("Unknown template: {}", config.template_id))?;
+    let derived = stage::derive(&config, template)
+        .ok_or_else(|| "Load a usable background image first".to_string())?;
+
+    export::export_stage(
+        &config,
         template,
-    )?;
-    write_stage_zip(&zip_path, &slug, &def_path, &sff_path)?;
-
-    Ok(_output_dir.to_string_lossy().into_owned())
-}
-
-fn write_stage_zip(
-    zip_path: &Path,
-    slug: &str,
-    def_path: &Path,
-    sff_path: &Path,
-) -> Result<(), String> {
-    let zip_file =
-        fs::File::create(zip_path).map_err(|e| format!("Failed to create ZIP package: {e}"))?;
-    let mut zip = zip::ZipWriter::new(zip_file);
-    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
-
-    for source_path in [def_path, sff_path] {
-        let file_name = source_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or_else(|| "Exported file has an invalid filename".to_string())?;
-        let entry_name = format!("{slug}/{file_name}");
-        let bytes = fs::read(source_path)
-            .map_err(|e| format!("Failed to read exported file for ZIP package: {e}"))?;
-        zip.start_file(entry_name, options)
-            .map_err(|e| format!("Failed to add file to ZIP package: {e}"))?;
-        zip.write_all(&bytes)
-            .map_err(|e| format!("Failed to write ZIP package: {e}"))?;
-    }
-
-    zip.finish()
-        .map_err(|e| format!("Failed to finish ZIP package: {e}"))?;
-    Ok(())
-}
-
-fn stage_slug(name: &str) -> String {
-    let mut slug = String::new();
-    let mut previous_was_separator = false;
-
-    for ch in name.trim().chars() {
-        if ch.is_ascii_alphanumeric() {
-            slug.push(ch);
-            previous_was_separator = false;
-        } else if (ch.is_ascii_whitespace() || ch == '_' || ch == '-') && !previous_was_separator {
-            slug.push('_');
-            previous_was_separator = true;
-        }
-    }
-
-    while slug.ends_with('_') {
-        slug.pop();
-    }
-
-    if slug.is_empty() {
-        "stage".to_string()
-    } else {
-        slug
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::stage_config::ConformanceState;
-    use crate::templates::T1;
-    use image::{ImageBuffer, Rgba};
-    use std::fs;
-    use tempfile::{tempdir, TempDir};
-
-    fn write_png(width: u32, height: u32) -> (TempDir, String) {
-        let dir = tempdir().expect("temp dir");
-        let path = dir.path().join(format!("{width}x{height}.png"));
-        let image = ImageBuffer::from_pixel(width, height, Rgba([80u8, 90, 100, 255]));
-        image.save(&path).expect("write png");
-        (dir, path.to_string_lossy().into_owned())
-    }
-
-    fn valid_config(image_path: String) -> StageConfig {
-        StageConfig {
-            name: "My Stage!".to_string(),
-            author: "Tester".to_string(),
-            music: None,
-            template_id: T1.id.to_string(),
-            bg_image_path: Some(image_path),
-            bg_image_width: Some(T1.bg_width),
-            bg_image_height: Some(T1.bg_height),
-            conformance_state: ConformanceState::Correct,
-        }
-    }
-
-    #[test]
-    fn creates_slug_from_stage_name() {
-        assert_eq!(stage_slug("My Stage! 2026"), "My_Stage_2026");
-        assert_eq!(stage_slug("***"), "stage");
-    }
-
-    #[test]
-    fn export_to_dir_writes_def_and_sff() {
-        let (_image_dir, image_path) = write_png(T1.bg_width, T1.bg_height);
-        let output_dir = tempdir().expect("output dir");
-
-        let result = export_stage_to_dir(valid_config(image_path), output_dir.path())
-            .expect("export stage");
-
-        assert_eq!(result, output_dir.path().to_string_lossy());
-        let sff = output_dir.path().join("My_Stage.sff");
-        let def = output_dir.path().join("My_Stage.def");
-        assert!(sff.exists());
-        assert!(def.exists());
-        assert!(fs::read_to_string(def).expect("read def").contains("spr = My_Stage.sff"));
-    }
-
-    #[test]
-    fn export_to_dir_writes_importable_zip_package() {
-        let (_image_dir, image_path) = write_png(T1.bg_width, T1.bg_height);
-        let output_dir = tempdir().expect("output dir");
-
-        export_stage_to_dir(valid_config(image_path), output_dir.path()).expect("export stage");
-
-        let zip_path = output_dir.path().join("My_Stage.zip");
-        assert!(zip_path.exists());
-        let zip_file = fs::File::open(zip_path).expect("open zip");
-        let mut archive = zip::ZipArchive::new(zip_file).expect("read zip");
-        assert!(archive.by_name("My_Stage/My_Stage.def").is_ok());
-        assert!(archive.by_name("My_Stage/My_Stage.sff").is_ok());
-    }
-
-    #[test]
-    fn export_rejects_empty_name() {
-        let (_image_dir, image_path) = write_png(T1.bg_width, T1.bg_height);
-        let output_dir = tempdir().expect("output dir");
-        let mut config = valid_config(image_path);
-        config.name = "   ".to_string();
-
-        let err = export_stage_to_dir(config, output_dir.path()).expect_err("validation error");
-
-        assert!(err.contains("Stage name"));
-    }
-
-    #[test]
-    fn export_fixture_from_env_when_present() {
-        let Ok(image_path) = std::env::var("MUGEN_STAGE_FIXTURE_IMAGE") else {
-            return;
-        };
-        let output_dir = std::env::var("MUGEN_STAGE_FIXTURE_OUT")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| tempdir().expect("temp dir").keep());
-        fs::create_dir_all(&output_dir).expect("create fixture output dir");
-
-        let mut config = valid_config(image_path);
-        config.name = "Apple Fixture".to_string();
-
-        export_stage_to_dir(config, &output_dir).expect("export fixture");
-
-        assert!(output_dir.join("Apple_Fixture.def").exists());
-        assert!(output_dir.join("Apple_Fixture.sff").exists());
-        assert!(output_dir.join("Apple_Fixture.zip").exists());
-    }
+        &derived,
+        std::path::Path::new(&output_dir),
+    )
 }

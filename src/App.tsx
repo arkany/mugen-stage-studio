@@ -63,7 +63,7 @@ function App() {
         />
       )}
 
-      {screen === "import" && selectedTemplate && (
+      {screen === "import" && selectedTemplate && config && (
         <ImageImport
           template={selectedTemplate}
           config={config}

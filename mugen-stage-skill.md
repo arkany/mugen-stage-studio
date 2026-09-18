@@ -51,10 +51,16 @@ This formula assumes the main background layer scrolls 1:1 with the camera (`del
 How far the camera is allowed to rise above the floor, in `localcoord` units.
 
 ```
-boundhigh = -(imageHeight - localcoordHeight)
+boundhigh = imageTopInScreenSpace = start.y - axis.y
 ```
 
-Clamped to `0` when `imageHeight ≤ localcoordHeight`. `boundhigh` is *informational*: real stages frequently use a smaller (less-negative) value to limit the camera's upward travel for artistic reasons. That is a creative choice, not an error. Templates record both the formula maximum and the source's actual choice.
+For the canonical mount (center-bottom axis, `start = 0, localcoordHeight`)
+that reduces to the familiar `-(imageHeight - localcoordHeight)` — but only
+for that mount. Derive it from the placement, not from the image height, or it
+will be wrong for every stage that anchors its artwork anywhere else. With
+zoom enabled, subtract half the extra visible height as well (Section 7b).
+
+Clamped to `0` when the artwork does not extend above the viewport. `boundhigh` is *informational*: real stages frequently use a smaller (less-negative) value to limit the camera's upward travel for artistic reasons. That is a creative choice, not an error. Templates record both the formula maximum and the source's actual choice.
 
 ### 1.4 `boundlow` — downward camera limit
 
@@ -83,9 +89,9 @@ axisX = imageWidth / 2
 axisY = imageHeight
 ```
 
-This is the documented Elecbyte convention. With center-bottom axis and `start = 0, 0` in the `[BG ]` element, the bottom edge of the image renders at the floor (`zoffset` line) on screen.
+This is the documented Elecbyte convention. It is only half the story: the axis is meaningless without the `[BG ] start` that pairs with it. With a center-bottom axis the matching value is **`start = 0, localcoordHeight`** — `start = 0, 0` mounts the bottom edge of the image on the *top* of the screen and puts the entire backdrop out of view. See Section 4.
 
-Phase 2 found three other axis conventions in the wild — `(w/2, 0)` top-anchored, `(w/2, zoffset)` floor-anchored, and `(0, 0)` corner-anchored. All can produce a working stage because IKEMEN GO is forgiving and `zoffset` compensates for the offset. See Section 4 for the full handling rule.
+Phase 2 found three other axis conventions in the wild — `(w/2, 0)` top-anchored, `(w/2, zoffset)` floor-anchored, and `(0, 0)` corner-anchored. All can produce a working stage because the `[BG ] start` compensates for the offset — **not** `zoffset`, which only places characters. Only 2 of the 48 readable stages use center-bottom, so treat the alternates as the norm. See Section 4 for the full handling rule.
 
 **Stage Studio always writes center-bottom axis.** Never expose this to the user as configurable.
 
@@ -95,23 +101,40 @@ Phase 2 found three other axis conventions in the wild — `(w/2, 0)` top-anchor
 |---|---|---|
 | Background drifts left or right as the camera scrolls | Sprite axisX off-center | Set `axisX = imageWidth / 2` |
 | Background drifts up or down between rounds | Sprite axisY wrong relative to convention | Set `axisY = imageHeight` (center-bottom) |
-| Characters float above the visible ground | `zoffset` too small (floor placed too high in coord space) | Increase `zoffset` |
+| Entire background missing / characters in empty space | `[BG ] start` not paired with the axis — usually `start = 0, 0` with a center-bottom axis | Set `start = 0, localcoordHeight` (Section 4) |
+| Characters float above the visible ground | `zoffset` too small (floor placed too high in coord space) | Increase `zoffset` — or place the floor line on the ground in the artwork and let it derive |
 | Characters sink below the visible ground / feet disappear | `zoffset` too large (floor placed too low) | Decrease `zoffset` |
 | Camera scrolls past the edge of the image (black gap or repeated edge) | `boundleft` / `boundright` magnitude exceeds formula | Recompute `±(imageWidth − localcoordWidth) / 2` |
+| Edge visible only when the camera zooms out | Bounds computed without `zoomout` | Recompute against `localcoordWidth / zoomout` (Section 7b) |
+| Characters' heads hidden behind the lifebars | `zoffset` too small — the floor sits too high on screen | Move the floor line down the artwork |
 | Camera doesn't scroll as far as the image allows | `boundleft` / `boundright` magnitude smaller than formula | Acceptable (creative choice) — recompute only if you want full scroll |
-| Background snaps upward when a character jumps | `boundhigh` shallower than image allows, or `verticalfollow` too aggressive | Recompute `boundhigh = -(imageHeight − localcoordHeight)` and lower `verticalfollow` |
+| Background snaps upward when a character jumps | `boundhigh` shallower than image allows, or `verticalfollow` too aggressive | Recompute `boundhigh` from the placement (Section 1.3) and lower `verticalfollow` |
 | Background scrolls slower than other elements | Layer's `delta < 1, 1` while you expected 1:1 parallax | Set `delta = 1, 1` on the main layer |
 
 ---
 
 ## Section 2 — Canonical Stage Templates
 
+> **Revised.** Templates no longer carry `boundleft`, `boundright`,
+> `boundhigh`, `start` or `zoffset`. Those are all functions of the actual
+> artwork — its real pixel dimensions and where the horizon sits in it — so
+> hardcoding them only works for the one source image they were copied from.
+> They are derived per-image in `stage-core::geometry`. The per-template
+> numbers below are retained as the *derivation of the reference stage*, not
+> as values to copy into code.
+>
+> **`T3_WIDE` is withdrawn.** Its bounds were computed with the `delta = 1`
+> formula (±960) while its cited source, Elecbyte's `stage0-720`, is
+> parallax-only and ships ±500. A wide backdrop is now handled by importing a
+> wider image into `T3`, which derives correct bounds for whatever width is
+> actually supplied. That leaves four templates, one per target resolution.
+
 One template per `localcoord` group, populated from Phase 2 data. Each template has a **confidence level**:
 
-- **Empirical** — values copied from a real third-party stage that passed Phase 2 validation.
-- **Formula-derived** — image dimensions, bounds, and camera params calculated from the formulas in Sections 1 and 3 because no usable real source existed.
+- **Empirical** — camera feel copied from a real third-party stage that passed Phase 2 validation.
+- **Formula-derived** — camera params scaled from the nearest template because no usable real source existed.
 
-Templates **must** be encoded as Rust constants in the Phase 4 backend, **not** as user-editable values. The user picks a template; the values are fixed.
+Templates **must** be encoded as Rust constants in the Phase 4 backend, **not** as user-editable values. The user picks a template; the camera feel is fixed, and the geometry follows the image.
 
 ---
 
@@ -346,7 +369,38 @@ If you use `tension = 60` on a 1280×720 stage, the camera will not follow chara
 
 ## Section 4 — The SFF Axis Rule
 
-Each sprite in an SFF file carries an `(axisX, axisY)` pair. The engine treats this as the *anchor point* of the sprite — when rendering, the sprite is placed such that this anchor sits at the rendering coordinate. For a `[BG ]` element with `start = 0, 0`, the engine places the axis at `(0, zoffset)` in `localcoord` space.
+Each sprite in an SFF file carries an `(axisX, axisY)` pair. The engine treats this as the *anchor point* of the sprite — when rendering, the sprite is placed such that this anchor sits at the coordinate given by the `[BG ]` element's `start`.
+
+### Screen space: where `start` is measured from
+
+`start` is measured from the **top-left of the viewport**, not from the floor:
+
+```
+x = 0                  horizontal centre of the viewport
+y = 0                  TOP edge of the viewport, camera at rest
+y = localcoordHeight   BOTTOM edge of the viewport, camera at rest
+```
+
+So for a sprite `w × h` with axis `(ax, ay)` and `start = sx, sy`:
+
+```
+left   = sx - ax        top    = sy - ay
+right  = left + w       bottom = top + h
+```
+
+> **Correction.** Earlier revisions of this document stated that `start = 0, 0`
+> places the axis at `(0, zoffset)`, so a center-bottom axis would put the
+> bottom of the image on the floor line. **That is wrong.** `start = 0, 0`
+> places the axis on the *top edge of the screen*; with a center-bottom axis
+> the whole backdrop ends up above the viewport and characters stand in empty
+> space. This was the single largest source of broken output.
+
+Both clean `delta = 1,1` reference stages confirm the top-of-viewport origin — in each, `sy - ay` is the artwork's top edge and `boundhigh` tracks it:
+
+| Stage | axis | `start` | image | `boundhigh` | `sy - ay` |
+|---|---|---|---|---|---|
+| `Japan` | (312, 483) | `0,240` | 624×483 | −200 | −243 |
+| `CF3GRAVE` | (900, 0) | `0,-326` | 1800×1050 | −326 | −326 |
 
 ### Center-bottom is the documented standard
 
@@ -355,7 +409,17 @@ axisX = imageWidth / 2
 axisY = imageHeight
 ```
 
-With center-bottom axis and `start = 0, 0`, the bottom edge of the image lands on the floor line (`zoffset`) and the image extends upward from there. This is the cleanest mental model: the axis represents "where the image meets the ground."
+The `start` that pairs with it, for a backdrop mounted flush with the bottom of the viewport, is:
+
+```
+start = 0, localcoordHeight
+```
+
+Note `Japan` ships exactly this: `start = 0,240` against a `localcoord` of 320×240.
+
+### Axis and `start` are a coupled pair
+
+Neither value means anything alone. Changing one without the other translates the artwork by the difference — rewriting `CF3GRAVE`'s axis from `(900, 0)` to `(900, 1050)` while leaving `start = 0,-326` moves the backdrop 1050 units up. Always rewrite them together.
 
 ### Other conventions exist in the wild
 
@@ -368,15 +432,19 @@ Phase 2 found four axis patterns in working stages:
 | Floor-anchored | `imageWidth/2` | `zoffset` value | `Google_campus` |
 | Corner | `0` | `0` | `fog_city_rumble` |
 
-All four can produce a working stage because `zoffset` compensates for whatever Y the axis sits at. Top-anchored is the most common alternate — characters are placed by `zoffset` and the image sits above them.
+All four produce working stages because **`start` compensates for whatever Y the axis sits at** — not `zoffset`. `zoffset` says where characters' feet go; it has no effect on where the backdrop is drawn. Of 48 stages with a readable sprite, only 2 use center-bottom, so the alternates are the norm rather than the exception.
 
 ### Stage Studio always writes center-bottom
 
 Never expose axis as a user-configurable value. On import:
 
-1. Read the source axis.
-2. If it's not center-bottom, **rewrite** to `(imageWidth/2, imageHeight)`.
-3. If the source's `[BG ]` element used `start = X, Y` to compensate for the non-canonical axis, recompute `start` so the floor still lands at `zoffset`.
+1. Read the source axis **and** the source `[BG ] start`.
+2. Resolve the artwork's actual edges: `top = start.y - axis.y`, `left = start.x - axis.x`.
+3. Rewrite the axis to `(imageWidth/2, imageHeight)`.
+4. Recompute `start` so the artwork lands on the *same edges*:
+   `start = (left + imageWidth/2, top + imageHeight)`.
+
+Step 4 is not optional. Rewriting the axis alone translates the backdrop by the difference between the two axis values, which for a 1050-tall image is 1050 units.
 
 The output is always center-bottom regardless of the input convention.
 
@@ -488,6 +556,29 @@ The current `parse_stage.py` does *not* implement these refinements — it picks
 
 ## Section 7 — Image Conformance Rules
 
+> **Revised.** The rules below ask "does this image match the template's
+> required dimensions, and can we crop or pad it into shape?" That is the
+> wrong question for the workflow this tool serves. A backdrop generated by an
+> image model comes out at 1536×1024 or 1792×1024 and will never match a
+> hand-picked 1800×1050; forcing it to meant cropping away the user's artwork
+> or rejecting it outright.
+>
+> The rule is now: **any image that covers the viewport is accepted at
+> whatever size it is, and the camera values are derived from that size.** A
+> larger backdrop is never a problem — it simply buys more scroll. Only an
+> image too small to fill the viewport is rejected, and the app reports the
+> exact minimum it needs:
+>
+> ```
+> minWidth  = ceil(localcoordWidth  / zoomout)
+> minHeight = ceil(localcoordHeight / zoomout)
+> ```
+>
+> An image short of that is scaled up uniformly, up to 2×, with a warning.
+> Non-uniform scale is still never applied. The "safe / unsafe transforms"
+> table below remains accurate on transform quality; the per-template
+> conformance windows that follow it are superseded.
+
 Stage Studio accepts user-supplied background images and conforms them to the chosen template. The conformance rules below preserve image quality and ensure the resulting stage is correct.
 
 ### Safe transforms
@@ -526,6 +617,84 @@ If the source is below the minimum viable size, the only safe option is to choos
 - The `boundhigh` is computed from image height. Never a user-facing field.
 
 The only image-related decisions the user makes are: **which image** and **how to handle the aspect mismatch** (crop vs extend).
+
+---
+
+## Section 7b — Stage Zoom
+
+Zoom was absent from every earlier revision of this document, from the Phase 1
+parser, and from the template constants. The Phase 2 dataset contains five
+Zoom / NoZoom stage pairs — `Jjjsoffice_11zoom`, `Warrior'sPeak_1.1Zoom`,
+`BalanceOfTheMultiverse_1.1Zoom`, `smurfs_village_1.1zoom` and their
+counterparts — and the analysis discarded the one field that distinguishes
+them. That omission is why zoom-enabled stages appeared to "scroll past the
+background edge" for no visible reason.
+
+### The parameters
+
+```
+[Camera]
+zoomin    = 1.2     ; largest scale the camera may reach (>= 1)
+zoomout   = 0.75    ; smallest scale the camera may reach (<= 1)
+startzoom = 1       ; scale at round start
+```
+
+### Why zoom invalidates every bound
+
+`zoomout` is a divisor on the viewport. At `zoomout = 0.75` the camera shows
+`1 / 0.75 = 1.333x` the normal area, so the *effective* viewport is wider and
+taller than `localcoord`:
+
+```
+visibleWidth  = localcoordWidth  / zoomout
+visibleHeight = localcoordHeight / zoomout
+```
+
+Every bound is computed against the visible size, not the nominal one:
+
+```
+boundright = (imageWidth - localcoordWidth / zoomout) / 2
+```
+
+The difference is not marginal. For an 1800x1050 backdrop in a 1280x720
+viewport:
+
+| `zoomout` | visible width | `boundright` |
+|---|---|---|
+| 1.0 (off) | 1280 | 260 |
+| 0.9 | 1422 | 189 |
+| 0.75 | 1707 | 46 |
+| 0.6 | 2133 | 0 — the backdrop cannot even fill the frame |
+
+A stage that hardcodes `boundright = 260` and then enables `zoomout = 0.75`
+lets the camera travel 214 units past the edge of its own artwork.
+
+### Minimum backdrop for a zoom-enabled stage
+
+```
+minWidth  = ceil(localcoordWidth  / zoomout)
+minHeight = ceil(localcoordHeight / zoomout)
+```
+
+At 1280x720 with `zoomout = 0.75` that is 1707x960 just to *fill the frame* at
+full zoom-out, before any scroll room. This is the number to give someone
+prompting an image generator.
+
+### The bottom edge
+
+Zooming out grows the viewport in both directions. A backdrop mounted flush
+with the bottom of the screen (`start = 0, localcoordHeight`) has no slack
+below the floor, so pulling back exposes its lower edge. A zoom-enabled stage
+wants artwork that continues below the floor line. Stage Studio warns about
+this rather than silently shifting the mount, because moving the backdrop down
+also moves the floor and the ground would no longer line up with the art.
+
+### Rule
+
+Never write a `zoomout` value without re-deriving the bounds that depend on
+it. Stage Studio omits the `[Camera] zoomin` / `zoomout` lines entirely when
+zoom is disabled, precisely so nobody can add one by hand without going back
+through the derivation.
 
 ---
 

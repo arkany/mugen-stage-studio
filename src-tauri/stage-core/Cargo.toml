@@ -1,0 +1,12 @@
+[package]
+name = "stage-core"
+version = "0.1.0"
+edition = "2021"
+description = "Coordinate model, camera derivations, and canonical templates for MUGEN / IKEMEN GO stages."
+
+# Deliberately dependency-light: no image decoding, no Tauri, no I/O. This
+# crate is pure arithmetic over stage geometry so it can be unit-tested
+# anywhere and later compiled to wasm for the web validator described in
+# VALIDATOR-CONCEPT.md.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
