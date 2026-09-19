@@ -1,27 +1,200 @@
 @import "tailwindcss";
+@import "@fontsource/bangers/400.css";
 
+/* Class-based dark mode: App toggles `.dark` on <html> (saved choice, else the
+   OS setting). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Tell the engine which palette to paint the things Tailwind can't reach:
-   scrollbars, the native <select> popup, and the file picker button. Without
-   this they stay light while everything around them goes dark. */
+/* Design tokens. Components use the Tailwind utilities generated from the
+   @theme block below (bg-surface, text-muted, border-line, …) — never raw
+   hex values. color-scheme keeps scrollbars, native selects and the file
+   picker in step with the theme. */
 :root {
   color-scheme: light;
+  --bg: #eef1f7;
+  --surface: #ffffff;
+  --surface-raised: #f6f7fb;
+  --surface-sunken: #e7ebf3;
+  --line: #d9dfeb;
+  --line-strong: #c3cbdc;
+  --ink: #121829;
+  --muted: #5a6580;
+  --p1: #d62f35;
+  --p1-hover: #b8222a;
+  --p1-fill: #c91d30;
+  --p1-soft: rgb(227 38 58 / 0.1);
+  --p2: #066d99;
+  --p2-soft: rgb(7 134 189 / 0.1);
+  --gold: #8a5a00;
+  --gold-soft: rgb(183 121 31 / 0.12);
+  --good: #0f7a40;
+  --good-soft: rgb(19 137 74 / 0.1);
+  --warn: #8f5200;
+  --warn-soft: rgb(184 106 0 / 0.1);
+  --bad: #b8222a;
+  --bad-soft: rgb(214 47 53 / 0.1);
+  --stage-bg: #1a2033;
+  --silhouette: #04060b;
 }
 
 :root.dark {
   color-scheme: dark;
+  --bg: #0b0f1a;
+  --surface: #121829;
+  --surface-raised: #182036;
+  --surface-sunken: #0e1321;
+  --line: #243049;
+  --line-strong: #34425f;
+  --ink: #eef1f8;
+  --muted: #8e99b3;
+  --p1: #ff4655;
+  --p1-hover: #ff5f6c;
+  /* Filled red surfaces that carry white text (≥4.5:1). */
+  --p1-fill: #d41f35;
+  --p1-soft: rgb(255 70 85 / 0.14);
+  --p2: #33c6ff;
+  --p2-soft: rgb(51 198 255 / 0.14);
+  --gold: #ffc53d;
+  --gold-soft: rgb(255 197 61 / 0.14);
+  --good: #34d67f;
+  --good-soft: rgb(52 214 127 / 0.14);
+  --warn: #ffab2e;
+  --warn-soft: rgb(255 171 46 / 0.14);
+  --bad: #ff5a5f;
+  --bad-soft: rgb(255 90 95 / 0.14);
+  --stage-bg: #070a12;
+  --silhouette: #04060b;
 }
 
-/* The app shell paints its own background, but overscroll and the area behind
-   a short page come from the body. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-sunken: var(--surface-sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-p1: var(--p1);
+  --color-p1-hover: var(--p1-hover);
+  --color-p1-fill: var(--p1-fill);
+  --color-p1-soft: var(--p1-soft);
+  --color-p2: var(--p2);
+  --color-p2-soft: var(--p2-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-stage: var(--stage-bg);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+  --font-display: "Bangers", "Impact", sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
-  background-color: #ffffff;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-:root.dark body {
-  background-color: oklch(13% 0.028 261.692); /* gray-950, matching <main> */
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
-/* Project-specific styles can go here. Tailwind v4 reads CSS variables from
-   the @import above; no further config file is required. */
+:focus-visible {
+  outline: 2px solid var(--p2);
+  outline-offset: 2px;
+}
+
+/* Thin, theme-aware scrollbars for the rail and preview (WebView2 + WebKit). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* Arcade flourishes --------------------------------------------------- */
+
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-8deg) scale(2.2);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(-8deg) scale(0.92);
+  }
+  75% {
+    transform: translate(-50%, -50%) rotate(-8deg) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(-8deg) scale(1);
+  }
+}
+
+@keyframes stamp-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-8deg) scale(1.1);
+  }
+}
+
+.stamp {
+  position: absolute;
+  z-index: 25;
+  left: 50%;
+  top: 42%;
+  animation:
+    stamp-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both,
+    stamp-out 400ms ease-in 1600ms forwards;
+  pointer-events: none;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.96);
+  }
+  60% {
+    transform: scale(1.015);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.pop {
+  animation: pop 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+  .stamp {
+    animation: stamp-out 300ms ease-in 1400ms forwards;
+    transform: translate(-50%, -50%) rotate(-8deg);
+  }
+}
