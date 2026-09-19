@@ -1,13 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getTemplates } from "../hooks/useTauriCommands";
 import type { StageTemplate } from "../types/stage";
+import {
+  RECOMMENDED_TEMPLATE_ID,
+  confidenceHelp,
+  confidenceLabel,
+  dims,
+  templateCopy,
+} from "../lib/templateMeta";
+import { SectionHeading } from "./SectionHeading";
 
 interface Props {
   templates: StageTemplate[];
   setTemplates: (t: StageTemplate[]) => void;
   selectedTemplateId: string | null;
-  setSelectedTemplateId: (id: string | null) => void;
-  onContinue: () => void;
+  setSelectedTemplateId: (id: string) => void;
+  /** Object URL of the loaded background, used to preview each crop shape. */
+  imageUrl: string | null;
 }
 
 export function TemplatePicker({
@@ -15,9 +24,10 @@ export function TemplatePicker({
   setTemplates,
   selectedTemplateId,
   setSelectedTemplateId,
-  onContinue,
+  imageUrl,
 }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     if (templates.length > 0) return;
@@ -26,73 +36,125 @@ export function TemplatePicker({
       .catch((e) => setLoadError(String(e)));
   }, [templates.length, setTemplates]);
 
+  // Arrow keys move the "cursor" like a character select screen.
+  const onKeyDown = (e: React.KeyboardEvent, index: number) => {
+    const delta =
+      e.key === "ArrowDown" || e.key === "ArrowRight"
+        ? 1
+        : e.key === "ArrowUp" || e.key === "ArrowLeft"
+          ? -1
+          : 0;
+    if (!delta) return;
+    e.preventDefault();
+    const next = (index + delta + templates.length) % templates.length;
+    setSelectedTemplateId(templates[next].id);
+    buttonRefs.current[next]?.focus();
+  };
+
   return (
-    <section className="p-6">
-      <h1 className="text-xl font-semibold mb-4">Pick a template</h1>
+    <section aria-labelledby="step-1-title">
+      <SectionHeading
+        step={1}
+        id="step-1-title"
+        title="Pick your arena"
+        subtitle="Choose the game resolution. You can change this later."
+      />
 
       {loadError && (
-        <p className="text-red-600 mb-4 dark:text-red-400">Failed to load templates: {loadError}</p>
+        <p className="mb-3 rounded-md bg-bad-soft p-3 text-[13px] text-bad">
+          Couldn't load resolutions. {loadError}
+        </p>
       )}
 
-      <ul className="space-y-2">
-        {templates.map((t) => {
+      <div role="radiogroup" aria-labelledby="step-1-title" className="flex flex-col gap-2">
+        {templates.map((t, i) => {
           const selected = t.id === selectedTemplateId;
+          const copy = templateCopy(t);
+          const recommended = t.id === RECOMMENDED_TEMPLATE_ID;
           return (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => setSelectedTemplateId(t.id)}
-                className={
-                  "w-full text-left p-3 border rounded " +
-                  (selected
-                    ? "border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/50"
-                    : "border-gray-300 hover:border-gray-500 dark:border-gray-700 dark:hover:border-gray-500")
-                }
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-medium">{t.displayName}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">
-                      viewport {t.localcoordW}×{t.localcoordH} · suggested
-                      backdrop {t.recommendedBgWidth}×{t.recommendedBgHeight}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1 dark:text-gray-400">
-                      Camera feel from {t.sourceStage}
-                      {t.sourceAuthor.startsWith("(") ? "" : ` (${t.sourceAuthor})`}
-                      {" · "}
-                      bounds and zoffset are derived from your image
-                    </div>
-                    {t.notes && (
-                      <div className="text-xs text-gray-400 mt-1 dark:text-gray-500">{t.notes}</div>
-                    )}
-                  </div>
+            <button
+              key={t.id}
+              ref={(el) => {
+                buttonRefs.current[i] = el;
+              }}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={`${copy.name}, ${t.localcoordW} by ${t.localcoordH}, ${copy.tagline}${recommended ? ", recommended" : ""}. ${confidenceLabel(t)}: ${confidenceHelp(t)}`}
+              tabIndex={selected || (!selectedTemplateId && i === 0) ? 0 : -1}
+              onClick={() => setSelectedTemplateId(t.id)}
+              onKeyDown={(e) => onKeyDown(e, i)}
+              className={
+                "group relative flex items-center gap-3 rounded-lg border-2 p-2.5 pr-3 text-left transition-[background-color,border-color,transform] duration-150 " +
+                (selected
+                  ? "pop border-p1 bg-p1-soft"
+                  : "border-transparent bg-raised hover:-translate-y-px hover:border-line-strong")
+              }
+            >
+              <AspectThumb template={t} imageUrl={imageUrl} selected={selected} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-[14px] font-bold">{copy.name}</span>
+                  {recommended && (
+                    <span className="shrink-0 rounded-sm bg-p1-fill px-1.5 py-px text-[11px] font-bold tracking-wide text-white">
+                      Recommended
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="whitespace-nowrap font-mono text-[12px] font-semibold">
+                    {dims(t.localcoordW, t.localcoordH)}
+                  </span>
                   <span
+                    title={confidenceHelp(t)}
                     className={
-                      "text-xs px-2 py-1 rounded " +
-                      (t.confidence === "Empirical"
-                        ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300"
-                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300")
+                      "text-[11px] font-semibold tracking-wide " +
+                      (t.confidence === "Empirical" ? "text-gold" : "text-muted")
                     }
                   >
-                    {t.confidence === "Empirical" ? "Empirical" : "Formula-derived"}
+                    {confidenceLabel(t)}
                   </span>
                 </div>
-              </button>
-            </li>
+                <div className="truncate text-[12px] text-muted">
+                  {selected ? `Suggested image: ${dims(t.recommendedBgWidth, t.recommendedBgHeight)} or larger` : copy.tagline}
+                </div>
+              </div>
+            </button>
           );
         })}
-      </ul>
-
-      <div className="mt-6">
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={selectedTemplateId === null}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed dark:bg-blue-500 dark:hover:bg-blue-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
-        >
-          Use Template
-        </button>
       </div>
     </section>
+  );
+}
+
+/** A small frame in the template's screen shape, filled with the user's image if they have one. */
+function AspectThumb({
+  template,
+  imageUrl,
+  selected,
+}: {
+  template: StageTemplate;
+  imageUrl: string | null;
+  selected: boolean;
+}) {
+  const ratio = template.localcoordW / template.localcoordH;
+  const height = 36;
+  const width = Math.round(height * ratio);
+  return (
+    <span className="grid h-10 w-16 shrink-0 place-items-center">
+      <span
+        className={
+          "block overflow-hidden rounded-[3px] border " +
+          (selected ? "border-p1" : "border-line-strong")
+        }
+        style={{
+          width,
+          height,
+          background: imageUrl
+            ? `center bottom / cover no-repeat url("${imageUrl}")`
+            : "linear-gradient(160deg, var(--p2-soft), var(--p1-soft))",
+        }}
+      />
+    </span>
   );
 }

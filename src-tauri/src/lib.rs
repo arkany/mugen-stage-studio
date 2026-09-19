@@ -5,6 +5,7 @@
 // the arithmetic that decides whether a stage actually works is testable
 // without a GUI toolchain — run `cargo test -p stage-core`.
 
+mod app_icon;
 mod commands;
 mod export;
 mod image_check;
@@ -21,6 +22,7 @@ pub fn run() {
             commands::preview_def,
             commands::default_output_dir,
             commands::export_stage,
+            app_icon::set_app_icon,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
