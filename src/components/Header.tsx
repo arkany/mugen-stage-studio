@@ -1,5 +1,6 @@
 import { Check, Moon, PanelRight, Sun } from "lucide-react";
 import { shortcutLabel } from "../lib/platform";
+import { AppIconPicker } from "./AppIconPicker";
 import logoDark from "../assets/logo-ink-dark.webp";
 import logoLight from "../assets/logo-ink-light.webp";
 
@@ -14,6 +15,8 @@ interface Props {
   onToggleDetails: () => void;
   theme: Theme;
   onToggleTheme: () => void;
+  appIcon: string;
+  onAppIconChange: (id: string) => void;
 }
 
 const STEPS: { id: StepId; label: string }[] = [
@@ -30,6 +33,8 @@ export function Header({
   onToggleDetails,
   theme,
   onToggleTheme,
+  appIcon,
+  onAppIconChange,
 }: Props) {
   return (
     <header className="flex shrink-0 items-center gap-6 border-b border-line bg-surface px-5 py-2">
@@ -78,6 +83,8 @@ export function Header({
           })}
         </ol>
       </nav>
+
+      <AppIconPicker value={appIcon} onChange={onAppIconChange} />
 
       <button
         type="button"

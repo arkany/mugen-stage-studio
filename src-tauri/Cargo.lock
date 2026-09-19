@@ -2081,6 +2081,9 @@ name = "mugen-stage-studio"
 version = "0.1.0"
 dependencies = [
  "image",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
  "serde",
  "serde_json",
  "stage-core",
@@ -3429,6 +3432,7 @@ dependencies = [
  "heck 0.5.0",
  "http",
  "http-range",
+ "image",
  "jni",
  "libc",
  "log",

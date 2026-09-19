@@ -46,3 +46,8 @@ export function exportStage(
 ): Promise<ExportResult> {
   return invoke<ExportResult>("export_stage", { config, outputDir });
 }
+
+/** Swap the running app's icon (Dock tile on macOS, window/taskbar elsewhere). */
+export function setAppIcon(id: string): Promise<void> {
+  return invoke<void>("set_app_icon", { id });
+}

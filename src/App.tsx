@@ -20,16 +20,19 @@ import {
   exportStage,
   loadImage,
   previewDef,
+  setAppIcon,
 } from "./hooks/useTauriCommands";
 import type { DerivedStage, ImportFit, StageConfig, StageTemplate } from "./types/stage";
 import { emptyConfig } from "./store/stageStore";
 import { RECOMMENDED_TEMPLATE_ID, minImageSize } from "./lib/templateMeta";
 import { hasPrimaryModifier } from "./lib/platform";
+import { APP_ICONS, DEFAULT_APP_ICON } from "./lib/appIcons";
 import "./App.css";
 
 const AUTHOR_KEY = "mss.author";
 const DETAILS_KEY = "mss.detailsOpen";
 const THEME_KEY = "theme";
+const APP_ICON_KEY = "mss.appIcon";
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp"];
 
 function readStored(key: string): string | null {
@@ -69,6 +72,10 @@ function fileName(path: string): string {
 
 function App() {
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [appIcon, setAppIconId] = useState(() => {
+    const saved = readStored(APP_ICON_KEY);
+    return APP_ICONS.some((i) => i.id === saved) ? saved! : DEFAULT_APP_ICON;
+  });
   const [templates, setTemplates] = useState<StageTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [config, setConfig] = useState<StageConfig | null>(null);
@@ -96,6 +103,15 @@ function App() {
     document.documentElement.classList.toggle("dark", theme === "dark");
     writeStored(THEME_KEY, theme);
   }, [theme]);
+
+  // Apply the chosen icon at launch and whenever it changes. The installed
+  // bundle's icon is the default, so a non-default choice is re-applied here.
+  useEffect(() => {
+    writeStored(APP_ICON_KEY, appIcon);
+    setAppIcon(appIcon).catch(() => {
+      // Not running inside Tauri (e.g. a plain browser); nothing to change.
+    });
+  }, [appIcon]);
 
   useEffect(() => {
     defaultOutputDir()
@@ -344,6 +360,8 @@ function App() {
         onToggleDetails={toggleDetails}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        appIcon={appIcon}
+        onAppIconChange={setAppIconId}
       />
 
       <div className="flex min-h-0 flex-1">
