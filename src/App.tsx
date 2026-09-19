@@ -348,7 +348,7 @@ function App() {
 
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-[380px] shrink-0 flex-col border-r border-line bg-surface">
-          <div className="min-h-0 flex-1 space-y-7 overflow-y-auto px-5 py-5">
+          <div className="relative min-h-0 flex-1 space-y-7 overflow-y-auto px-5 py-5">
             <TemplatePicker
               templates={templates}
               setTemplates={setTemplates}

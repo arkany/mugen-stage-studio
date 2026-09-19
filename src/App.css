@@ -103,6 +103,14 @@ body,
   height: 100%;
 }
 
+/* The app shell never scrolls; the rail, preview and drawer scroll on their
+   own. This also stops a stray absolutely positioned element from making the
+   whole window scroll. */
+html,
+body {
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   background: var(--bg);
