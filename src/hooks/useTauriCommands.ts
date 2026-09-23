@@ -8,7 +8,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   DerivedStage,
   ExportResult,
+  IkemenLab,
   ImportResult,
+  InstallResult,
   StageConfig,
   StageTemplate,
 } from "../types/stage";
@@ -45,6 +47,21 @@ export function exportStage(
   outputDir: string,
 ): Promise<ExportResult> {
   return invoke<ExportResult>("export_stage", { config, outputDir });
+}
+
+/** IKEMEN Lab and the IKEMEN GO folder it manages, or null if it isn't installed. */
+export function detectIkemenLab(): Promise<IkemenLab | null> {
+  return invoke<IkemenLab | null>("detect_ikemen_lab");
+}
+
+/** Writes the stage into IKEMEN GO's stages folder and lists it in select.def.
+ *  The destination is resolved by the backend, never passed from here. */
+export function installToIkemen(config: StageConfig): Promise<InstallResult> {
+  return invoke<InstallResult>("install_to_ikemen", { config });
+}
+
+export function openIkemenLab(): Promise<void> {
+  return invoke<void>("open_ikemen_lab");
 }
 
 /** Swap the running app's icon (Dock tile on macOS, window/taskbar elsewhere). */

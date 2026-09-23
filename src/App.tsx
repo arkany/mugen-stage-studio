@@ -10,6 +10,7 @@ import {
   ExportBar,
   ExportResultPanel,
   StageNameFields,
+  type Destination,
   type ExportOutcome,
 } from "./components/PreviewExport";
 import { StagePreview } from "./components/StagePreview";
@@ -17,12 +18,14 @@ import { DetailsDrawer } from "./components/DetailsDrawer";
 import {
   defaultOutputDir,
   deriveStage,
+  detectIkemenLab,
   exportStage,
+  installToIkemen,
   loadImage,
   previewDef,
   setAppIcon,
 } from "./hooks/useTauriCommands";
-import type { DerivedStage, ImportFit, StageConfig, StageTemplate } from "./types/stage";
+import type { DerivedStage, IkemenLab, ImportFit, StageConfig, StageTemplate } from "./types/stage";
 import { emptyConfig } from "./store/stageStore";
 import { RECOMMENDED_TEMPLATE_ID, minImageSize } from "./lib/templateMeta";
 import { hasPrimaryModifier } from "./lib/platform";
@@ -33,6 +36,7 @@ const AUTHOR_KEY = "mss.author";
 const DETAILS_KEY = "mss.detailsOpen";
 const THEME_KEY = "theme";
 const APP_ICON_KEY = "mss.appIcon";
+const DESTINATION_KEY = "mss.destination";
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp"];
 
 function readStored(key: string): string | null {
@@ -85,6 +89,11 @@ function App() {
   const [def, setDef] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [outputDir, setOutputDir] = useState("");
+  const [lab, setLab] = useState<IkemenLab | null>(null);
+  // The user's preference. IKEMEN GO is the default whenever IKEMEN Lab can take the stage.
+  const [preferredDestination, setPreferredDestination] = useState<Destination>(() =>
+    readStored(DESTINATION_KEY) === "folder" ? "folder" : "ikemen",
+  );
   const [detailsOpen, setDetailsOpen] = useState(() => readStored(DETAILS_KEY) === "1");
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<ExportOutcome | null>(null);
@@ -96,6 +105,8 @@ function App() {
   const celebrated = useRef<string | null>(null);
 
   const template = templates.find((t) => t.id === selectedTemplateId) ?? null;
+  const labReady = lab !== null && lab.problem === null;
+  const destination: Destination = preferredDestination === "ikemen" && labReady ? "ikemen" : "folder";
   const usable = fit?.type === "Usable";
   const tooSmall = fit?.type === "TooSmall";
 
@@ -112,6 +123,23 @@ function App() {
       // Not running inside Tauri (e.g. a plain browser); nothing to change.
     });
   }, [appIcon]);
+
+  // Look for IKEMEN Lab at launch and whenever the window regains focus, so
+  // setting it up there (or installing it) shows up here without a restart.
+  useEffect(() => {
+    const check = () =>
+      detectIkemenLab()
+        .then(setLab)
+        .catch(() => setLab(null));
+    void check();
+    window.addEventListener("focus", check);
+    return () => window.removeEventListener("focus", check);
+  }, []);
+
+  const chooseDestination = useCallback((d: Destination) => {
+    setPreferredDestination(d);
+    writeStored(DESTINATION_KEY, d);
+  }, []);
 
   useEffect(() => {
     defaultOutputDir()
@@ -230,9 +258,12 @@ function App() {
   const chooseOutputDir = async () => {
     try {
       const picked = await open({ directory: true, multiple: false, defaultPath: outputDir || undefined });
-      if (typeof picked === "string") setOutputDir(picked);
+      if (typeof picked === "string") {
+        setOutputDir(picked);
+        chooseDestination("folder");
+      }
     } catch (e) {
-      setExportResult({ ok: false, message: String(e) });
+      setExportResult({ ok: false, message: String(e), destination: "folder" });
     }
   };
 
@@ -245,7 +276,7 @@ function App() {
         ? "Working out the camera…"
         : !nameOk
           ? "Give your stage a name to export."
-          : !outputDir
+          : destination === "folder" && !outputDir
             ? "Choose where to save it."
             : null;
 
@@ -254,15 +285,21 @@ function App() {
     setExporting(true);
     setExportResult(null);
     try {
-      const result = await exportStage(config, outputDir);
-      setExportResult({ ok: true, result });
-      setStamp({ key: Date.now(), text: "Stage ready!", tone: "good" });
+      if (destination === "ikemen") {
+        const install = await installToIkemen(config);
+        setExportResult({ ok: true, result: install.export, install });
+        setStamp({ key: Date.now(), text: "Installed!", tone: "good" });
+      } else {
+        const result = await exportStage(config, outputDir);
+        setExportResult({ ok: true, result, install: null });
+        setStamp({ key: Date.now(), text: "Stage ready!", tone: "good" });
+      }
     } catch (e) {
-      setExportResult({ ok: false, message: String(e) });
+      setExportResult({ ok: false, message: String(e), destination });
     } finally {
       setExporting(false);
     }
-  }, [config, blockedReason, exporting, outputDir]);
+  }, [config, blockedReason, exporting, outputDir, destination]);
 
   const toggleDetails = useCallback(() => {
     setDetailsOpen((open) => {
@@ -403,6 +440,9 @@ function App() {
                 }}
                 outputDir={outputDir}
                 onChooseDir={chooseOutputDir}
+                lab={lab}
+                destination={destination}
+                onDestinationChange={chooseDestination}
                 defReady={nameOk && derived !== null}
                 sffReady={derived !== null}
               />
@@ -410,7 +450,12 @@ function App() {
           </div>
 
           {config && (
-            <ExportBar blockedReason={blockedReason} exporting={exporting} onExport={runExport} />
+            <ExportBar
+              blockedReason={blockedReason}
+              exporting={exporting}
+              onExport={runExport}
+              destination={destination}
+            />
           )}
         </aside>
 
