@@ -8,6 +8,7 @@
 mod app_icon;
 mod commands;
 mod export;
+mod ikemen_lab;
 mod image_check;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -22,6 +23,9 @@ pub fn run() {
             commands::preview_def,
             commands::default_output_dir,
             commands::export_stage,
+            commands::detect_ikemen_lab,
+            commands::install_to_ikemen,
+            commands::open_ikemen_lab,
             app_icon::set_app_icon,
         ])
         .run(tauri::generate_context!())

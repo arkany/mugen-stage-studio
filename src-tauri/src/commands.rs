@@ -10,6 +10,7 @@ use stage_core::stage::{self, DerivedStage, ImportFit, StageConfig};
 use stage_core::templates::{self, StageTemplate};
 
 use crate::export::{self, ExportResult};
+use crate::ikemen_lab;
 use crate::image_check;
 
 #[tauri::command]
@@ -116,4 +117,34 @@ pub fn export_stage(config: StageConfig, output_dir: String) -> Result<ExportRes
         &derived,
         std::path::Path::new(&output_dir),
     )
+}
+
+/// IKEMEN Lab, if it's installed, and whether it has an IKEMEN GO folder the
+/// stage can be installed into. `None` hides the option entirely.
+#[tauri::command]
+pub fn detect_ikemen_lab() -> Option<ikemen_lab::IkemenLab> {
+    ikemen_lab::detect()
+}
+
+/// Install the stage into the IKEMEN GO folder IKEMEN Lab manages.
+///
+/// The destination is looked up again here rather than taken from the
+/// frontend, so this can only ever write where IKEMEN Lab says the game is.
+#[tauri::command]
+pub fn install_to_ikemen(config: StageConfig) -> Result<ikemen_lab::InstallResult, String> {
+    let lab = ikemen_lab::detect().ok_or("IKEMEN Lab isn't installed")?;
+    if let Some(problem) = lab.problem {
+        return Err(problem);
+    }
+    let ikemen_dir = lab.ikemen_go_path.ok_or("IKEMEN Lab has no IKEMEN GO folder set")?;
+    let template = templates::by_id(&config.template_id)
+        .ok_or_else(|| format!("Unknown template: {}", config.template_id))?;
+    let derived = stage::derive(&config, template)
+        .ok_or_else(|| "Load a usable background image first".to_string())?;
+    ikemen_lab::install(&config, template, &derived, std::path::Path::new(&ikemen_dir))
+}
+
+#[tauri::command]
+pub fn open_ikemen_lab() -> Result<(), String> {
+    ikemen_lab::open_app()
 }

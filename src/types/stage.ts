@@ -137,6 +137,23 @@ export interface ExportResult {
   resampled: boolean;
 }
 
+/** IKEMEN Lab, when installed. `problem` is null when stages can be
+ *  installed straight into its IKEMEN GO folder. */
+export interface IkemenLab {
+  appPath: string;
+  ikemenGoPath: string | null;
+  problem: string | null;
+}
+
+export interface InstallResult {
+  export: ExportResult;
+  ikemenGoPath: string;
+  /** The select.def line, e.g. `stages/Neon/Neon.def`. */
+  entry: string;
+  newlyRegistered: boolean;
+  replaced: boolean;
+}
+
 export interface ImportResult {
   config: StageConfig;
   fit: ImportFit;

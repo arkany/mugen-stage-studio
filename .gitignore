@@ -23,11 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Xcode user-local state
-xcuserdata/
-*.xcuserstate
-DerivedData/
-
 # Python bytecode
 __pycache__/
 *.pyc

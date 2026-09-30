@@ -9,6 +9,7 @@
 
 pub mod def;
 pub mod geometry;
+pub mod select_def;
 pub mod sff;
 pub mod stage;
 pub mod templates;
