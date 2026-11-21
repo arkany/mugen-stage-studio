@@ -1,10 +1,12 @@
 # Fast checks for the two things that can break without a macOS runner: the
-# frontend type-checks/builds, and the pure-arithmetic core crate's tests.
+# frontend type-checks/builds, and the tests of the two Tauri-free crates: the
+# pure-arithmetic core and the image/export crate.
 #
 # The Tauri app itself is deliberately not built here. It needs a GTK/WebKit
 # toolchain on Linux and is only ever shipped from macOS, so building it would
-# cost minutes to prove something no one relies on. `stage-core` is a separate
-# crate precisely so its tests run anywhere - see the note in src-tauri/Cargo.toml.
+# cost minutes to prove something no one relies on. `stage-core` and `stage-io`
+# are separate crates precisely so their tests run anywhere - see the note in
+# src-tauri/Cargo.toml.
 
 name: CI
 
@@ -40,7 +42,7 @@ jobs:
       - run: npm run build
 
   core:
-    name: stage-core tests
+    name: stage-core and stage-io tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -50,6 +52,6 @@ jobs:
 
       # Rust, cargo and clippy ship with the ubuntu-latest runner image, so
       # there is no toolchain action to install or pin here.
-      - run: cargo test -p stage-core
+      - run: cargo test -p stage-core -p stage-io
 
-      - run: cargo clippy -p stage-core --all-targets -- -D warnings
+      - run: cargo clippy -p stage-core -p stage-io --all-targets -- -D warnings

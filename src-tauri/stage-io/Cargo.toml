@@ -1,0 +1,14 @@
+[package]
+name = "stage-io"
+version = "0.1.0"
+edition = "2021"
+description = "Image reading and stage file export (DEF + SFF) for MUGEN Stage Studio."
+
+# The file-handling half of the backend: reading backdrop dimensions and
+# writing the exported stage. It needs an image codec but no Tauri, so
+# `cargo test -p stage-io` runs on a plain runner without GTK/WebKit, the
+# same way `stage-core` does.
+[dependencies]
+stage-core = { path = "../stage-core" }
+serde = { version = "1", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
