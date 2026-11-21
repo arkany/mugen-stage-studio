@@ -9,8 +9,8 @@ use serde::Serialize;
 use stage_core::stage::{self, DerivedStage, ImportFit, StageConfig};
 use stage_core::templates::{self, StageTemplate};
 
-use crate::export::{self, ExportResult};
-use crate::image_check;
+use stage_io::export::{self, ExportResult};
+use stage_io::image_check;
 
 #[tauri::command]
 pub fn get_templates() -> Vec<StageTemplate> {

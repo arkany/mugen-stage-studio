@@ -2080,13 +2080,13 @@ dependencies = [
 name = "mugen-stage-studio"
 version = "0.1.0"
 dependencies = [
- "image",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
  "serde",
  "serde_json",
  "stage-core",
+ "stage-io",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -3260,6 +3260,15 @@ name = "stage-core"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "stage-io"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "serde",
+ "stage-core",
 ]
 
 [[package]]

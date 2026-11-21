@@ -16,8 +16,12 @@ ship from one codebase.
   arithmetic with no Tauri and no image decoding, so `cargo test -p
   stage-core` runs the logic that decides whether a stage works without
   needing a GUI toolchain. The web validator will share this crate.
+- **`stage-io`** ([`src-tauri/stage-io/`](./src-tauri/stage-io/)) — reads
+  backdrop dimensions and writes the exported `.def` and `.sff`. Needs an
+  image codec but not Tauri, so its tests (including a full export round
+  trip) run in CI alongside `stage-core`.
 - **Rust backend** ([`src-tauri/src/`](./src-tauri/src/)) — the desktop shell:
-  reads image dimensions, forwards to `stage-core`, owns file I/O.
+  Tauri commands that forward to `stage-core` and `stage-io`.
 - **React frontend** ([`src/`](./src/)) — three step-based screens
   (`TemplatePicker` → `ImageImport` → `PreviewExport`) talking to Rust via
   typed `invoke` wrappers in [`src/hooks/useTauriCommands.ts`](./src/hooks/useTauriCommands.ts).
@@ -61,8 +65,9 @@ Read in this order:
 From this directory:
 
 ```bash
-# The logic that decides whether a stage works (32 tests, no GUI deps)
-(cd src-tauri && cargo test -p stage-core)
+# The logic that decides whether a stage works, plus image reading and the
+# full DEF/SFF export round trip (no GUI deps; this is what CI runs)
+(cd src-tauri && cargo test -p stage-core -p stage-io)
 
 # Backend builds clean
 (cd src-tauri && cargo build)
@@ -88,8 +93,9 @@ Subsequent runs are fast (Vite HMR + Rust incremental compile).
 | [`src-tauri/stage-core/src/templates.rs`](./src-tauri/stage-core/src/templates.rs) | 4 `StageTemplate` constants — camera feel only, no geometry |
 | [`src-tauri/stage-core/src/stage.rs`](./src-tauri/stage-core/src/stage.rs) | `StageConfig`, `ImportFit`, and the `derive` entry point |
 | [`src-tauri/stage-core/src/def.rs`](./src-tauri/stage-core/src/def.rs) | DEF serialization |
+| [`src-tauri/stage-io/src/export.rs`](./src-tauri/stage-io/src/export.rs) | Writes the DEF and SFF, resamples and thumbnails the backdrop |
 | [`src-tauri/src/commands.rs`](./src-tauri/src/commands.rs) | Tauri commands: `get_templates`, `load_image`, `derive_stage`, `preview_def`, `export_stage` |
-| [`src-tauri/src/image_check.rs`](./src-tauri/src/image_check.rs) | Header-only image dimension reads |
+| [`src-tauri/stage-io/src/image_check.rs`](./src-tauri/stage-io/src/image_check.rs) | Header-only image dimension reads |
 | [`src/components/StagePreview.tsx`](./src/components/StagePreview.tsx) | The preview canvas and draggable floor line |
 | [`src/types/stage.ts`](./src/types/stage.ts) | TypeScript mirror of the Rust structs |
 | [`tools/`](./tools/) | Phase 1 parser and the dataset re-validator |

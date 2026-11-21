@@ -1,14 +1,13 @@
 // MUGEN Stage Studio — Tauri backend entry point.
 //
-// The stage geometry, templates and DEF writing all live in the `stage-core`
-// crate; this crate is the desktop shell around them. Keeping them apart means
-// the arithmetic that decides whether a stage actually works is testable
-// without a GUI toolchain — run `cargo test -p stage-core`.
+// The stage geometry, templates and DEF writing live in the `stage-core`
+// crate, and image reading and file export live in `stage-io`; this crate is
+// the desktop shell around them. Keeping them apart means the code that
+// decides whether a stage works is testable without a GUI toolchain — run
+// `cargo test -p stage-core -p stage-io`.
 
 mod app_icon;
 mod commands;
-mod export;
-mod image_check;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
